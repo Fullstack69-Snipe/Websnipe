@@ -1,184 +1,263 @@
-.counter {
-  font-size: 16px;
-  padding: 5px 10px;
-  border-radius: 5px;
-  color: var(--accent);
-  background: var(--accent-bg);
-  border: 2px solid transparent;
-  transition: border-color 0.3s;
-  margin-bottom: 24px;
+/* สไตล์ของหน้าจอและ component ทั้งหมด — import จาก App.tsx */
 
-  &:hover {
-    border-color: var(--accent-border);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
+/* ===== Navbar ===== */
+nav.container {
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+nav strong {
+  font-size: 1.1rem;
+}
+nav a.active {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.4rem;
+}
+nav select {
+  width: auto;
+  margin: 0;
+  padding: 0.35rem 2rem 0.35rem 0.75rem;
+  font-size: 0.85rem;
 }
 
-.hero {
-  position: relative;
-
-  .base,
-  .framework,
-  .vite {
-    inset-inline: 0;
-    margin: 0 auto;
-  }
-
-  .base {
-    width: 170px;
-    position: relative;
-    z-index: 0;
-  }
-
-  .framework,
-  .vite {
-    position: absolute;
-  }
-
-  .framework {
-    z-index: 1;
-    top: 34px;
-    height: 28px;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
-      scale(1.4);
-  }
-
-  .vite {
-    z-index: 0;
-    top: 107px;
-    height: 26px;
-    width: auto;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
-      scale(0.8);
-  }
+/* ===== แถบค้นหา + filter ===== */
+.toolbar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.toolbar input {
+  flex: 1;
+  margin: 0;
+}
+.toolbar select {
+  width: 12rem;
+  margin: 0;
 }
 
-#center {
+/* ===== การ์ดอุปกรณ์ ===== */
+.equipment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+.equipment-grid article {
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 25px;
-  place-content: center;
-  place-items: center;
-  flex-grow: 1;
-
-  @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
-  }
 }
-
-#next-steps {
+.equipment-grid article > p {
+  flex: 1;
+  color: var(--pico-muted-color);
+}
+.equipment-grid header {
   display: flex;
-  border-top: 1px solid var(--border);
-  text-align: left;
-
-  & > div {
-    flex: 1 1 0;
-    padding: 32px;
-    @media (max-width: 1024px) {
-      padding: 24px 20px;
-    }
-  }
-
-  .icon {
-    margin-bottom: 16px;
-    width: 22px;
-    height: 22px;
-  }
-
-  @media (max-width: 1024px) {
-    flex-direction: column;
-    text-align: center;
-  }
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+.equipment-grid footer button {
+  margin: 0;
 }
 
-#docs {
-  border-right: 1px solid var(--border);
+/* ===== ป้ายสถานะ ===== */
+.badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  color: #fff;
+  white-space: nowrap;
+}
+.badge-available { background: #2e7d5b; }
+.badge-borrowed  { background: #b9761a; }
 
-  @media (max-width: 1024px) {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
+/* ===== สถานะว่าง / error ===== */
+.empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--pico-muted-color);
+}
+.error {
+  color: #c0392b;
 }
 
-#next-steps ul {
-  list-style: none;
+/* ===== Dialog ขอยืม ===== */
+dialog article {
+  max-width: 420px;
+}
+dialog footer {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+dialog footer button {
+  width: auto;
+  margin: 0;
+}
+
+/* ===== รูปในการ์ด ===== */
+.equipment-card {
   padding: 0;
-  display: flex;
-  gap: 8px;
-  margin: 32px 0 0;
-
-  .logo {
-    height: 18px;
-  }
-
-  a {
-    color: var(--text-h);
-    font-size: 16px;
-    border-radius: 6px;
-    background: var(--social-bg);
-    display: flex;
-    padding: 6px 12px;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    transition: box-shadow 0.3s;
-
-    &:hover {
-      box-shadow: var(--shadow);
-    }
-    .button-icon {
-      height: 18px;
-      width: 18px;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    li {
-      flex: 1 1 calc(50% - 8px);
-    }
-
-    a {
-      width: 100%;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  }
+  overflow: hidden;
 }
-
-#spacer {
-  height: 88px;
-  border-top: 1px solid var(--border);
-  @media (max-width: 1024px) {
-    height: 48px;
-  }
-}
-
-.ticks {
-  position: relative;
+.equipment-card img,
+.equipment-card__placeholder {
   width: 100%;
+  aspect-ratio: 5 / 3;
+  object-fit: cover;
+  display: block;
+}
+.equipment-card__placeholder {
+  display: grid;
+  place-items: center;
+  background: var(--pico-muted-border-color);
+  color: var(--pico-muted-color);
+  font-size: 0.9rem;
+}
+.equipment-card header,
+.equipment-card > p,
+.equipment-card footer {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+.equipment-card footer {
+  padding-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
 
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    top: -4.5px;
-    border: 5px solid transparent;
-  }
+/* ===== จำนวนคงเหลือ ===== */
+.stock {
+  font-size: 0.85rem;
+  color: var(--pico-muted-color);
+}
+.stock strong {
+  color: #2e7d5b;
+}
+.stock--empty strong {
+  color: #c0392b;
+}
 
-  &::before {
-    left: 0;
-    border-left-color: var(--border);
-  }
-  &::after {
-    right: 0;
-    border-right-color: var(--border);
-  }
+/* ===== ป้ายสถานะการยืม ===== */
+.badge-pending   { background: #6b7a8b; }
+.badge-approved  { background: #0f7a6c; }
+.badge-rejected  { background: #c0392b; }
+.badge-returning { background: #b9761a; }
+.badge-returned  { background: #2c3e50; }
+
+/* ===== ตาราง ===== */
+h2 {
+  font-size: 1.2rem;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+table button {
+  width: auto;
+  margin: 0;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
+}
+td.overdue {
+  color: #c0392b;
+  font-weight: 600;
+}
+.muted {
+  color: var(--pico-muted-color);
+}
+
+/* ===== หน้า Staff: toolbar + ตาราง ===== */
+.toolbar .muted {
+  flex: 1;
+  margin: 0;
+  align-self: center;
+}
+.toolbar > button {
+  width: auto;
+  margin: 0;
+}
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+.thumb {
+  width: 64px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+}
+.thumb--empty {
+  display: grid;
+  place-items: center;
+  background: var(--pico-muted-border-color);
+  color: var(--pico-muted-color);
+  font-size: 0.7rem;
+}
+
+/* ===== ฟอร์มอุปกรณ์ ===== */
+.form-preview {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.form-preview img {
+  width: 120px;
+  aspect-ratio: 5 / 3;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.form-preview button {
+  width: auto;
+  margin: 0;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+/* ===== สรุปตัวเลข ===== */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.stat {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.stat strong {
+  font-size: 1.9rem;
+  line-height: 1;
+  color: #0f7a6c;
+}
+.stat span {
+  font-size: 0.85rem;
+  color: var(--pico-muted-color);
+}
+.stat--pending strong { color: #6b7a8b; }
+.stat--warn strong    { color: #b9761a; }
+.stat--danger strong  { color: #c0392b; }
+
+/* ===== แท็บกรอง ===== */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.tabs button {
+  width: auto;
+  margin: 0;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.9rem;
 }
