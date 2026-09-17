@@ -1,0 +1,47 @@
+name: preflight # You can also change this to another name to avoid warning with existing group.
+services:
+  frontend:
+    container_name: pf-frontend
+    build: .
+    ports:
+      - ${NGINX_PORT}:6000
+    networks:
+      - preflight_pf-net
+    environment:
+      - NGINX_PROXY=${NGINX_PROXY}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ---- เพิ่มใหม่ ----
+  backend:
+    container_name: pf-backend
+    build: ./backend
+    networks:
+      - preflight_pf-net
+    environment:
+      - PORT=3000
+      - DB_FILE=/data/data.sqlite
+      - UPLOAD_DIR=/data/uploads
+      - DEFAULT_USER_ID=u1
+    volumes:
+      # เก็บไฟล์ DB กับรูปที่อัปโหลดไว้ ไม่หายตอน rebuild
+      - pf-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    # ไม่ต้อง map ports ออกนอก เพราะ frontend คุยผ่าน network ภายในอยู่แล้ว
+    # ถ้าจะยิง curl ทดสอบจากเครื่องตัวเอง เปิดบรรทัดล่างนี้
+    # ports:
+    #   - "3001:3000"
+
+networks:
+  preflight_pf-net: # Check by using `docker network ls` command
+    external: true
+
+volumes:
+  pf-data:

@@ -1,7 +1,9 @@
-node_modules/
+node_modules
+npm-debug.log
 db/*.sqlite
 db/*.sqlite-wal
 db/*.sqlite-shm
 uploads/*
 !uploads/.gitkeep
+.git
 .env

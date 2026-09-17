@@ -1,10 +1,8 @@
 {
-  "extends": [
-    "@tsconfig/node-lts/tsconfig.json",
-    "@tsconfig/node-ts/tsconfig.json"
-  ],
+  "extends": "@tsconfig/node-lts/tsconfig.json",
   "compilerOptions": {
     "types": ["node"],
+    "baseUrl": ".",
     "rootDir": ".",
     "outDir": "./dist",
     "paths": {
@@ -12,5 +10,6 @@
       "@src/*": ["./src/*"]
     }
   },
-  "include": ["./db/**/*", "./drizzle.config.ts", "./src/**/*"]
+  "include": ["./db/**/*.ts", "./drizzle.config.ts", "./src/**/*.ts"],
+  "exclude": ["./dist"]
 }
