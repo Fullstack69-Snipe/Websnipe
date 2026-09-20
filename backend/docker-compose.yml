@@ -1,47 +1,44 @@
-name: preflight # You can also change this to another name to avoid warning with existing group.
-services:
-  frontend:
-    container_name: pf-frontend
-    build: .
-    ports:
-      - ${NGINX_PORT}:6000
-    networks:
-      - preflight_pf-net
-    environment:
-      - NGINX_PROXY=${NGINX_PROXY}
-    depends_on:
-      backend:
-        condition: service_healthy
+# backend/docker-compose.yml — รันเฉพาะ backend ตอนพัฒนา
+#
+# ต้องมี network preflight_pf-net อยู่ก่อน (สร้างโดย db/docker-compose.yml)
+#   cd ../db && docker compose up -d
+#
+# ถ้าจะรันทั้งระบบ ใช้ docker-compose.yml ที่ root แทนไฟล์นี้
+name: preflight
 
-  # ---- เพิ่มใหม่ ----
+services:
   backend:
     container_name: pf-backend
-    build: ./backend
-    networks:
-      - preflight_pf-net
+    # context เป็น root ของ repo เพราะ backend ใช้แพ็กเกจ db แบบ file:../db
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    ports:
+      - "3001:3000"
     environment:
       - PORT=3000
-      - DB_FILE=/data/data.sqlite
       - UPLOAD_DIR=/data/uploads
-      - DEFAULT_USER_ID=u1
+      - POSTGRES_HOST=pf-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_APP_USER=${POSTGRES_APP_USER}
+      - POSTGRES_APP_PASSWORD=${POSTGRES_APP_PASSWORD}
+      - RUN_SEED=true
     volumes:
-      # เก็บไฟล์ DB กับรูปที่อัปโหลดไว้ ไม่หายตอน rebuild
-      - pf-data:/data
+      - pf-uploads:/data/uploads
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 3s
       retries: 5
-      start_period: 10s
+      start_period: 15s
+    networks:
+      - preflight_pf-net
     restart: unless-stopped
-    # ไม่ต้อง map ports ออกนอก เพราะ frontend คุยผ่าน network ภายในอยู่แล้ว
-    # ถ้าจะยิง curl ทดสอบจากเครื่องตัวเอง เปิดบรรทัดล่างนี้
-    # ports:
-    #   - "3001:3000"
 
 networks:
-  preflight_pf-net: # Check by using `docker network ls` command
+  preflight_pf-net:
     external: true
 
 volumes:
-  pf-data:
+  pf-uploads:

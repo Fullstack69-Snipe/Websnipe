@@ -30,21 +30,13 @@
     "db:seed": "tsx db/seed.ts",
     "prototype": "tsx db/prototype.ts",
     "typecheck": "tsc --noEmit",
-    "build": "pnpm build:esm && pnpm build:cjs",
+    "build": "npm run build:esm && npm run build:cjs",
     "build:esm": "tsc && tsc-alias",
-    "build:cjs": "tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs",
-    "prepare": "pnpm build"
+    "build:cjs": "tsc -p tsconfig.cjs.json && tsc-alias -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "devEngines": {
-    "packageManager": {
-      "name": "pnpm",
-      "version": "^11.9.0",
-      "onFail": "download"
-    }
-  },
   "type": "module",
   "dependencies": {
     "dotenv": "^17.4.2",

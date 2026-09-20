@@ -11,7 +11,10 @@ export { connectionString } from "@db/utils.js";
 export {
   borrowsTable,
   equipmentTable,
+  sessionsTable,
+  userIdentitiesTable,
   usersTable,
+  authProviderEnum,
   borrowStatusEnum,
   roleEnum,
   HOLDING_STATUSES,
@@ -22,7 +25,10 @@ export {
   type NewEquipment,
   type NewUser,
   type Role,
+  type Session,
   type User,
+  type UserIdentity,
+  type AuthProvider,
 } from "@db/schema.js";
 
 export { borrowModel, type BorrowRow } from "@db/models/borrowModel.js";
@@ -33,3 +39,8 @@ export {
   type EquipmentRow,
 } from "@db/models/equipmentModel.js";
 export { userModel, type UserRow } from "@db/models/userModel.js";
+export {
+  authModel,
+  type AuthUser,
+  type OAuthProfile,
+} from "@db/models/authModel.js";

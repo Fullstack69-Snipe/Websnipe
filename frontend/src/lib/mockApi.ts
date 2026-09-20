@@ -3,7 +3,7 @@ import type { Equipment, EquipmentInput, Borrow, BorrowStatus, User, Role } from
 
 const delay = (ms = 400) => new Promise((r) => setTimeout(r, ms))
 
-// ผู้ใช้ปัจจุบัน — ชั่วคราว พอทำ login จริงค่อยเอาจาก token
+// ผู้ใช้ปัจจุบันของโหมด mock (VITE_USE_MOCK=true) — ตัวจริงมาจาก session ที่ backend
 export const CURRENT_USER_ID = 'u1'
 
 // ---------- ข้อมูลตั้งต้น ----------
@@ -192,6 +192,22 @@ export const mockApi = {
   async listUsers(): Promise<User[]> {
     await delay()
     return users
+  },
+
+  // ===== auth (โหมด mock: ถือว่า login เป็น CURRENT_USER_ID อยู่แล้วเสมอ) =====
+  async me(): Promise<User & { activeRole: Role }> {
+    await delay(0)
+    const u = findUser(CURRENT_USER_ID)
+    return { ...u, activeRole: u.role }
+  },
+
+  async authProviders(): Promise<{ providers: { name: string; label: string }[] }> {
+    await delay(0)
+    return { providers: [] }
+  },
+
+  async logout(): Promise<void> {
+    await delay(0)
   },
 
   async updateUserRole(userId: string, role: Role): Promise<User> {

@@ -28,49 +28,49 @@ function parseInput(body) {
 
 const equipmentController = {
   // GET /api/equipment
-  list(req, res) {
-    res.json(equipmentModel.listAll());
+  async list(req, res) {
+    res.json(await equipmentModel.listAll());
   },
 
   // GET /api/equipment/:id
-  getOne(req, res) {
-    const item = equipmentModel.findById(req.params.id);
+  async getOne(req, res) {
+    const item = await equipmentModel.findById(req.params.id);
     if (!item) throw notFound('ไม่พบอุปกรณ์');
     res.json(item);
   },
 
   // POST /api/equipment
-  create(req, res) {
+  async create(req, res) {
     const input = parseInput(req.body);
-    res.status(201).json(equipmentModel.create(input));
+    res.status(201).json(await equipmentModel.create(input));
   },
 
   // PUT /api/equipment/:id
-  update(req, res) {
+  async update(req, res) {
     const { id } = req.params;
-    if (!equipmentModel.findById(id)) throw notFound('ไม่พบอุปกรณ์');
+    if (!await equipmentModel.findById(id)) throw notFound('ไม่พบอุปกรณ์');
 
     const input = parseInput(req.body);
 
     // กันลดจำนวนต่ำกว่าที่ถูกยืมอยู่ (ข้อความเดียวกับ mockApi)
-    const holding = equipmentModel.borrowedCount(id);
+    const holding = await equipmentModel.borrowedCount(id);
     if (input.quantity < holding) {
       throw conflict(`ลดจำนวนไม่ได้ ตอนนี้ถูกยืมอยู่ ${holding} ชิ้น`);
     }
 
-    res.json(equipmentModel.update(id, input));
+    res.json(await equipmentModel.update(id, input));
   },
 
   // DELETE /api/equipment/:id
-  remove(req, res) {
+  async remove(req, res) {
     const { id } = req.params;
-    if (!equipmentModel.findById(id)) throw notFound('ไม่พบอุปกรณ์');
+    if (!await equipmentModel.findById(id)) throw notFound('ไม่พบอุปกรณ์');
 
-    if (equipmentModel.borrowedCount(id) > 0) {
+    if (await equipmentModel.borrowedCount(id) > 0) {
       throw conflict('อุปกรณ์กำลังถูกยืมอยู่ ลบไม่ได้');
     }
 
-    equipmentModel.remove(id);
+    await equipmentModel.remove(id);
     res.status(204).end();
   }
 };

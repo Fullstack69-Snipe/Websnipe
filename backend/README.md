@@ -1,86 +1,46 @@
-# pf-backend — Backend ระบบยืม-คืนอุปกรณ์
+# backend
 
-Express + SQLite เขียนให้เข้ากับ frontend เดิมแบบ **drop-in** ทุก endpoint คืน field
-ชื่อตรงกับ `types.ts` และข้อความ error ตรงกับที่ `mockApi.ts` เคย throw ไว้
-เปลี่ยน frontend แค่บรรทัด import เท่านั้น
+REST API ของระบบยืม-คืนอุปกรณ์ — Express 4 (CommonJS) + PostgreSQL
 
-ฟังพอร์ต **3000** ชื่อ container **pf-backend** ให้ตรงกับ `NGINX_PROXY=http://pf-backend:3000` ใน `.env.test`
-
----
-
-## รันแบบเร็วสุด
-
-```bash
-cd backend
-npm install
-npm run seed        # ใส่ข้อมูลตั้งต้นชุดเดียวกับ mockApi
-npm start           # http://localhost:3000
-```
-
-ตรวจว่ารันอยู่: `curl localhost:3000/api/health`
-
-รันชุดทดสอบ (39 เคส เทียบกับสัญญาของ mockApi):
-
-```bash
-npm run seed:reset
-npm start &
-node db/smoke-test.js
-```
-
-## รันด้วย Docker
-
-วาง `backend/` ไว้ข้างๆ `Dockerfile` ของ frontend แล้วเพิ่ม service `backend` ลงใน
-`docker-compose.yml` ตามไฟล์ตัวอย่าง `docker-compose.example.yml` จากนั้น
-
-```bash
-docker compose --env-file .env.test up -d --build
-docker compose exec backend npm run seed
-```
-
-จุดที่ต้องคงไว้: `container_name: pf-backend` และ `PORT=3000` เพราะ nginx ฝั่ง frontend
-proxy ไปที่ชื่อนี้ ถ้าเปลี่ยนต้องแก้ `NGINX_PROXY` ด้วย
+ไม่ได้ต่อฐานข้อมูลเอง แต่เรียกผ่านแพ็กเกจ [`db`](../db/) ที่ import แบบ `file:../db`
+ตรรกะทางธุรกิจและการตรวจสิทธิ์ทั้งหมดอยู่ที่นี่
 
 ---
 
-## ต่อกับ frontend (3 ขั้น)
+## รัน
 
-**1. ก็อปไฟล์ 2 ไฟล์จาก `frontend-patch/` ไปที่ `frontend/src/lib/`**
+ปกติรันจาก root ของ repo พร้อมทั้งระบบ — ดู [README หลัก](../README.md)
 
-- `realApi.ts` — ตัวเรียก backend จริง ชื่อฟังก์ชันเหมือน `mockApi` ทุกตัว
-- `api.ts` — ตัวสลับ mock / ของจริงด้วย env
-
-**2. แก้ import ในไฟล์ที่ใช้ `mockApi` อยู่** (`EquipmentList.tsx`, `MyBorrows.tsx`,
-`BorrowRequests.tsx`, `ManageEquipment.tsx`)
-
-```diff
-- import { mockApi } from '../lib/mockApi'
-+ import { api } from '../lib/api'
+```bash
+docker compose up -d --build
 ```
 
-แล้ว replace `mockApi.` → `api.` ในไฟล์นั้น ไม่ต้องแก้ตรรกะอื่นเลย เพราะ signature
-เหมือนกันหมด (มี type assertion ใน `compat-check` ยืนยันตอน compile)
+รันเฉพาะ backend (ต้องมี postgres ขึ้นอยู่ก่อน):
 
-**3. ทับ `role.tsx` ด้วยเวอร์ชันใน `frontend-patch/`**
-
-ต่างจากเดิมแค่เรียก `setCurrentRole(r)` เพิ่มใน `setRole` เพื่อให้ role ที่สลับบนจอ
-ถูกส่งไปกับทุก request ถ้าไม่ทำขั้นนี้ สลับเป็น staff บนหน้าจอแล้วจะยังโดนตอบ 403 อยู่
-
-### ตั้งค่า vite (ตอน dev)
-
-ใน `vite.config.ts` ให้ proxy `/api` กับ `/uploads` ไปที่ backend:
-
-```ts
-server: {
-  proxy: {
-    '/api': 'http://localhost:3000',
-    '/uploads': 'http://localhost:3000',
-  },
-}
+```bash
+cd db && docker compose up -d      # ยก postgres + สร้าง network
+cd ../backend
+cp .env.example .env
+docker compose up -d --build       # เปิดพอร์ต 3001 ไว้ให้ยิงทดสอบตรงๆ
 ```
 
-หรือข้าม proxy โดยตั้ง `VITE_API_BASE=http://localhost:3000/api` ใน `.env.local` (CORS เปิดไว้ให้แล้ว)
+รันบนเครื่องตัวเองโดยไม่ผ่าน container:
 
-กลับไปใช้ mock ชั่วคราว: ตั้ง `VITE_USE_MOCK=true`
+```bash
+cd db && pnpm build                # ต้อง build แพ็กเกจ db ก่อน
+cd ../backend && pnpm install
+POSTGRES_HOST=localhost pnpm dev
+```
+
+### ทดสอบ
+
+```bash
+BASE=http://localhost:6002/api node db/smoke-test.js
+```
+
+39 เคส ครอบคลุมทุก endpoint, ทุกสิทธิ์, ข้อความ error และวงจรการยืมทั้งวงจร
+สคริปต์สร้าง session ใส่ฐานข้อมูลโดยตรงเพื่อใช้ทดสอบ แล้วลบทิ้งเมื่อจบ
+(ไม่มีช่องทางลัดใดๆ ในตัว backend)
 
 ---
 
@@ -88,111 +48,133 @@ server: {
 
 ทุก path ขึ้นต้นด้วย `/api` — error ตอบรูปแบบ `{ "error": "ข้อความภาษาไทย" }`
 
-| mockApi | HTTP | สิทธิ์ |
-|---|---|---|
-| `listEquipment()` | `GET /equipment` | ทุกคน |
-| `createEquipment(input)` | `POST /equipment` | staff, admin |
-| `updateEquipment(id, input)` | `PUT /equipment/:id` | staff, admin |
-| `deleteEquipment(id)` | `DELETE /equipment/:id` | staff, admin |
-| `requestBorrow(equipmentId, dueDate)` | `POST /borrows` | ทุกคน |
-| `listMyBorrows()` | `GET /borrows/mine` | ทุกคน |
-| `requestReturn(borrowId)` | `PUT /borrows/:id/request-return` | เจ้าของรายการ |
-| `listBorrows()` | `GET /borrows` | staff, admin |
-| `approveBorrow(borrowId)` | `PUT /borrows/:id/approve` | staff, admin |
-| `rejectBorrow(borrowId)` | `PUT /borrows/:id/reject` | staff, admin |
-| `confirmReturn(borrowId)` | `PUT /borrows/:id/confirm-return` | staff, admin |
-| `listUsers()` | `GET /users` | admin |
-| `updateUserRole(userId, role)` | `PUT /users/:id/role` | admin |
-| *(เพิ่มใหม่)* `me()` | `GET /me` | ทุกคน |
-| *(เพิ่มใหม่)* `uploadImage(file)` | `POST /uploads` | staff, admin |
+### ไม่ต้องเข้าสู่ระบบ
 
-### การอัปโหลดรูป
+| HTTP | ทำอะไร |
+| --- | --- |
+| `GET /health` | ใช้กับ healthcheck ของ docker |
+| `GET /auth/providers` | ช่องทาง login ที่เปิดใช้อยู่ |
+| `GET /auth/:provider` | เด้งไปหน้า login ของผู้ให้บริการ |
+| `GET /auth/:provider/callback` | ผู้ให้บริการเรียกกลับมาที่นี่ |
 
-`types.ts` กำหนด `imageUrl: string | null` ดังนั้นการอัปโหลดแยกเป็น 2 ขั้น
-endpoint อุปกรณ์จึงยังเป็น JSON ล้วน ไม่ต้องแก้ type:
+### ต้องเข้าสู่ระบบ
 
-```ts
-const url = await api.uploadImage(file)           // -> "/uploads/172...png"
-await api.createEquipment({ name, description, quantity, imageUrl: url })
+| HTTP | สิทธิ์ |
+| --- | --- |
+| `POST /auth/logout` | ทุกคน |
+| `GET /me` | ทุกคน |
+| `GET /equipment` · `GET /equipment/:id` | ทุกคน |
+| `POST /equipment` · `PUT /equipment/:id` · `DELETE /equipment/:id` | staff, admin |
+| `POST /uploads` | staff, admin |
+| `POST /borrows` | ทุกคน |
+| `GET /borrows/mine` | ทุกคน |
+| `PUT /borrows/:id/request-return` | เจ้าของรายการ (staff/admin ทำแทนได้) |
+| `GET /borrows` | staff, admin |
+| `PUT /borrows/:id/approve` · `/reject` · `/confirm-return` | staff, admin |
+| `GET /users` · `PUT /users/:id/role` | admin |
+
+### อัปโหลดรูป
+
+แยกเป็นสองขั้นเพราะ `imageUrl` เป็น string ธรรมดา endpoint อุปกรณ์จึงยังเป็น JSON ล้วน
+
+```
+POST /api/uploads   (multipart, field = "file")  ->  { "url": "/uploads/172....png" }
 ```
 
 รับ jpg / jpeg / png / gif / webp ไม่เกิน 5MB เสิร์ฟกลับที่ `/uploads/<filename>`
-
-### ตัวตนผู้ใช้ (ยังไม่มี login)
-
-แทน `CURRENT_USER_ID` ด้วย 2 header — `realApi.ts` ใส่ให้อัตโนมัติ:
-
-| header | ความหมาย |
-|---|---|
-| `x-user-id` | id ผู้ใช้ ไม่ส่งมาใช้ `u1` (ตั้งได้ที่ `DEFAULT_USER_ID`) |
-| `x-role` | role ที่ใช้ตรวจสิทธิ์ ไม่ส่งมาใช้ role จริงจาก DB |
-
-ผู้ใช้ตั้งต้นเหมือน mockApi: `u1` สมชาย (user), `u2` สมหญิง (staff), `u3` ผู้ดูแล (admin), `u4` วิชัย (user)
+ไฟล์เก็บใน volume `pf-uploads` แยกจากฐานข้อมูล
 
 ---
 
-## จุดที่ยึดตาม mockApi เป๊ะๆ
+## การเข้าสู่ระบบ
 
-**`available` ไม่ได้เก็บใน DB** — คำนวณสดจากตาราง `borrows` ทุกครั้ง
-(`quantity - COUNT(สถานะ approved หรือ returning)`) เหมือน `withAvailable()` ในของเดิม
-จึงไม่มีทางที่ตัวเลขจะเพี้ยนจากความจริง
+OAuth 2.0 authorization-code flow เขียนเองตรงๆ ไม่ผ่านไลบรารี (ดู `src/controllers/authController.js`)
 
-**`pending` ไม่ตัดจำนวนคงเหลือ** — ตัดตอน `approve` เท่านั้น เพราะ staff อาจปฏิเสธ
-และ `returning` ยังนับว่าถือของอยู่ จะคืนเข้าสต็อกตอน `confirm-return`
+```
+1. GET /api/auth/google          -> สุ่ม state เก็บใส่คุกกี้ แล้ว redirect ไป Google
+2. Google เด้งกลับ /callback     -> ตรวจ state, แลก code เป็น access token
+3. ดึงโปรไฟล์ -> หา/สร้างผู้ใช้ -> สร้าง session -> ตั้งคุกกี้ -> เด้งเข้าหน้าแรก
+```
 
-วงจรสถานะ: `pending` → `approved` → `returning` → `returned` และ `pending` → `rejected`
+- **session เก็บในฐานข้อมูล** ไม่ใช่ JWT คุกกี้ `pf_session` เก็บแค่ token สุ่ม 32 ไบต์
+  ออกจากระบบ = ลบแถวจริง จึงเพิกถอนได้ทันที
+- คุกกี้เป็น httpOnly + SameSite=Lax และตั้ง `Secure` อัตโนมัติเมื่อ
+  `NODE_ENV=production` และ `APP_URL` เป็น https
+- **role อ่านจากฐานข้อมูลเท่านั้น** ไม่มี header ให้ override
+  (เวอร์ชันก่อนหน้าใช้ `x-user-id` / `x-role` ซึ่งแปลว่าใครส่ง `x-role: admin` มาก็ได้สิทธิ์เต็ม)
+- ผู้สมัครใหม่ได้ role `user` เสมอ ตั้ง `ADMIN_EMAILS` เพื่อให้อีเมลนั้นได้ admin อัตโนมัติ
+  และจะยกระดับให้ทุกครั้งที่ login จึงใช้กู้สิทธิ์ตัวเองได้
 
-| กติกา | ข้อความ |
-|---|---|
-| ยืมของที่หมด | อุปกรณ์ชิ้นนี้ถูกยืมหมดแล้ว |
-| อนุมัติแต่ของหมดไปก่อน | อุปกรณ์หมดแล้ว ถูกอนุมัติให้คนอื่นไปก่อน |
-| ลดจำนวนต่ำกว่าที่ยืมอยู่ | ลดจำนวนไม่ได้ ตอนนี้ถูกยืมอยู่ N ชิ้น |
-| ลบของที่ถูกยืมอยู่ | อุปกรณ์กำลังถูกยืมอยู่ ลบไม่ได้ |
+การจับคู่บัญชีทำตามลำดับ: หาจาก (provider, account id) ก่อน → ไม่เจอค่อยหาจากอีเมล
+ที่ผู้ให้บริการยืนยันแล้ว → ยังไม่เจอจึงสร้างใหม่
+คนเดียวผูกได้ทั้ง Google, GitHub และ Discord ถ้าอีเมลเดียวกัน
+
+> ผู้ใช้จาก seed (`u1`–`u4`) เป็นข้อมูลตัวอย่างเท่านั้น ไม่ได้ผูกกับบัญชี OAuth ใด
+> จึง login เข้าบัญชีเหล่านั้นไม่ได้
 
 ---
 
-## โครงสร้างไฟล์
+## โครงสร้าง
 
 ```
-backend/
-├── src/
-│   ├── server.js                  ประกอบ app + ฟังพอร์ต
-│   ├── config/db.js               เปิด SQLite + รัน schema
-│   ├── models/                    ชั้น query (ไม่มี logic HTTP)
-│   │   ├── equipmentModel.js      ← available คำนวณที่นี่
-│   │   ├── borrowModel.js
-│   │   └── userModel.js
-│   ├── controllers/               ตรวจ input + กติกาธุรกิจ
-│   │   ├── equipmentController.js
-│   │   ├── borrowController.js
-│   │   └── userController.js
-│   ├── routes/                    map path → controller + สิทธิ์
-│   │   ├── equipmentRoutes.js
-│   │   ├── borrowRoutes.js
-│   │   ├── userRoutes.js
-│   │   └── uploadRoutes.js
-│   ├── middleware/
-│   │   ├── identity.js            ← แทน CURRENT_USER_ID + ตรวจ role
-│   │   ├── upload.js              multer
-│   │   └── errorHandler.js
-│   └── utils/
-│       ├── HttpError.js
-│       └── wrap.js
-├── db/
-│   ├── schema.sql                 โครงตาราง
-│   ├── seed.js                    ข้อมูลตั้งต้นชุดเดียวกับ mockApi
-│   ├── smoke-test.js              ทดสอบ 39 เคส
-│   └── data.sqlite                (สร้างอัตโนมัติ)
-├── uploads/                       รูปที่อัปโหลด
-├── Dockerfile
-└── docker-compose.example.yml
+src/
+├── server.js               ประกอบ middleware ตามลำดับ + กวาด session หมดอายุวันละครั้ง
+│
+├── config/oauth.js         ตั้งค่าผู้ให้บริการ — เจ้าไหนไม่มี env ก็ปิดอัตโนมัติ
+│
+├── middleware/
+│   ├── identity.js         อ่าน session จากคุกกี้ -> req.user / req.role + requireRole()
+│   ├── upload.js           multer (5MB, เฉพาะไฟล์รูป)
+│   └── errorHandler.js     รวมรูปแบบ error — 500 ไม่ส่งรายละเอียดออกไป
+│
+├── routes/                 ผูก path เข้ากับ controller + ระบุสิทธิ์ที่ต้องมี
+├── controllers/            ตรวจ input, บังคับกติกาทางธุรกิจ, ตอบ JSON
+├── models/                 ทางผ่านบางๆ ไปยังแพ็กเกจ db
+└── utils/
+    ├── HttpError.js        error ที่พ่วง status (badRequest, unauthorized, ...)
+    └── wrap.js             ห่อ handler ให้ error ใน async วิ่งไป errorHandler
 ```
 
-## สิ่งที่ต้องทำต่อก่อนใช้งานจริง
+ลำดับ middleware ใน `server.js` สำคัญ:
 
-1. **ทำ login จริง** — ตอนนี้ใครก็ส่ง `x-role: admin` มาได้ ไม่มีการยืนยันตัวตนจริง
-   ต้องเพิ่ม JWT แล้วแก้ `middleware/identity.js` ให้อ่านจาก token
-   (controller ทุกตัวอ่านจาก `req.user` / `req.role` อยู่แล้ว จึงไม่ต้องแก้)
-2. ถ้าจะขึ้น production หลายเครื่องพร้อมกัน ควรย้ายจาก SQLite ไป Postgres
-   (`schema.sql` แก้ไม่มาก เปลี่ยน `TEXT` timestamp เป็น `timestamptz`)
-3. เพิ่มการตรวจว่าไฟล์ที่อัปโหลดเป็นรูปจริง (ตอนนี้เช็คแค่นามสกุลกับขนาด)
+```
+cors -> json -> cookieParser -> /uploads (static) -> /api/health
+     -> /api/auth/*  (ยังไม่ต้องมีตัวตน)
+     -> attachIdentity  (ทุกอย่างหลังจากนี้ต้อง login)
+     -> route ที่เหลือ -> notFound -> errorHandler
+```
+
+---
+
+## กติกาทางธุรกิจ
+
+- **`available` ไม่เก็บในฐานข้อมูล** — คำนวณสดทุกครั้งจาก `quantity` ลบจำนวนที่ถือของอยู่
+  (สถานะ `approved` กับ `returning`) `pending` ไม่นับเพราะอาจถูกปฏิเสธ
+- ลดจำนวนอุปกรณ์ต่ำกว่าที่ถูกยืมอยู่ไม่ได้
+- ลบอุปกรณ์ที่กำลังถูกยืมอยู่ไม่ได้ ถ้าลบได้จะลบประวัติการยืมที่จบแล้วตามไปด้วย
+  (FK เป็น `ON DELETE RESTRICT`)
+- แจ้งคืนได้เฉพาะรายการของตัวเอง ยกเว้น staff/admin ทำแทนได้
+- "เกินกำหนด" ไม่ใช่สถานะในฐานข้อมูล แต่คำนวณจาก `approved` + `dueDate < วันนี้`
+
+---
+
+## ตัวแปรที่ใช้
+
+ดูรายการเต็มใน `.env.example` — ตัวที่เฉพาะของ backend:
+
+| ตัวแปร | ค่าเริ่มต้น | ใช้ทำอะไร |
+| --- | --- | --- |
+| `PORT` | 3000 | พอร์ตที่ express ฟัง |
+| `UPLOAD_DIR` | `/data/uploads` | ที่เก็บรูปที่อัปโหลด |
+| `CORS_ORIGINS` | localhost:5173, :6002 | origin ที่เรียก API แบบแนบคุกกี้ได้ |
+| `ADMIN_EMAILS` | (ว่าง) | อีเมลที่ได้ admin อัตโนมัติ |
+| `SESSION_DAYS` | 30 | อายุ session |
+| `RUN_SEED` | — | `true` = ใส่ข้อมูลตัวอย่างตอนบูต (ข้ามถ้ามีข้อมูลแล้ว) |
+
+---
+
+## สิ่งที่ยังไม่ได้ทำ
+
+- ไม่มี rate limit ที่ `/api/auth/*`
+- ไม่มี refresh token — session หมดอายุแล้วต้อง login ใหม่
+- ยังไม่มี endpoint สำหรับถอนการผูกบัญชี OAuth หรือลบผู้ใช้

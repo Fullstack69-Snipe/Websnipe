@@ -1,0 +1,17 @@
+# build context ของ backend คือ root ของ repo (ดู docker-compose.yml)
+# ถ้าไม่กันไว้ node_modules ทั้งสามโฟลเดอร์ (~300MB) จะถูกส่งเข้า docker daemon ทุกครั้งที่ build
+**/node_modules
+**/dist
+**/.git
+
+# ความลับ — ห้ามหลุดเข้าไปใน image
+**/.env
+!**/.env.example
+
+# ของที่ไม่เกี่ยวกับ build
+**/*.log
+**/.DS_Store
+backend/uploads/*
+!backend/uploads/.gitkeep
+frontend/dist
+db/dist

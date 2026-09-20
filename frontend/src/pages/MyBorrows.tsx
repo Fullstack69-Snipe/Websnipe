@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
-import { mockApi } from '../lib/mockApi'
+import { api } from '../lib/api'
 import type { Borrow, BorrowStatus } from '../types'
 import StatusBadge from '../components/StatusBadge'
 
@@ -14,7 +14,7 @@ export default function MyBorrows() {
 
   async function load() {
     try {
-      setBorrows(await mockApi.listMyBorrows())
+      setBorrows(await api.listMyBorrows())
     } catch {
       setError('โหลดรายการไม่สำเร็จ')
     } finally {
@@ -29,7 +29,7 @@ export default function MyBorrows() {
   async function handleReturn(id: string) {
     if (!confirm('แจ้งคืนอุปกรณ์ชิ้นนี้? เจ้าหน้าที่จะตรวจรับและปิดรายการให้')) return
     try {
-      await mockApi.requestReturn(id)
+      await api.requestReturn(id)
       await load()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')

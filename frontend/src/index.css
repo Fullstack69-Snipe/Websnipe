@@ -2,3 +2,71 @@
 :root {
   --pico-font-family: 'IBM Plex Sans Thai', 'Leelawadee UI', 'Segoe UI', system-ui, sans-serif;
 }
+
+/* ---------- หน้าเข้าสู่ระบบ ---------- */
+.signin {
+  max-width: 26rem;
+  margin-block: 4rem;
+}
+
+.signin header p {
+  margin-block: 0.25rem 0;
+  color: var(--pico-muted-color);
+}
+
+.signin__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  margin-block-end: 0.75rem;
+}
+
+.signin__btn svg {
+  flex: none;
+}
+
+/* Google กำหนดในไกด์ไลน์ว่าปุ่มต้องเป็นพื้นขาว/เทาเข้ม ห้ามเอาโลโก้สี่สีไปวางบนพื้นสี */
+.signin__btn--google {
+  --pico-background-color: #fff;
+  --pico-border-color: #dadce0;
+  --pico-color: #3c4043;
+}
+
+.signin__btn--github {
+  --pico-background-color: #24292f;
+  --pico-border-color: #24292f;
+  --pico-color: #fff;
+}
+
+.signin__btn--discord {
+  --pico-background-color: #5865f2;
+  --pico-border-color: #5865f2;
+  --pico-color: #fff;
+}
+
+/* โหมดมืด: ปุ่ม Google ต้องสลับเป็นพื้นเข้มตามไกด์ไลน์ ไม่ใช่ขาวจ้าอยู่กลางจอ */
+@media (prefers-color-scheme: dark) {
+  .signin__btn--google {
+    --pico-background-color: #131314;
+    --pico-border-color: #8e918f;
+    --pico-color: #e3e3e3;
+  }
+}
+
+/* ---------- เมนูผู้ใช้บนแถบนำทาง ---------- */
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.user-menu small {
+  color: var(--pico-muted-color);
+}
+
+.avatar {
+  border-radius: 50%;
+  object-fit: cover;
+}

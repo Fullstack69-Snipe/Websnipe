@@ -3,23 +3,37 @@ server {
     listen [::]:6000;
     server_name localhost;
 
+    # ขนาดไฟล์อัปโหลดสูงสุด ต้องไม่น้อยกว่าที่ backend รับไว้
+    client_max_body_size 10m;
+
     location / {
         root /usr/share/nginx/html;
         index index.html index.htm;
         try_files $uri /index.html;
     }
 
+    # ---- API ----
+    # สำคัญ: ห้าม rewrite ตัด /api ออก เพราะ backend ผูก route ไว้ใต้ /api อยู่แล้ว
+    # (express: app.use('/api/equipment', ...)) ถ้าตัดออกจะกลายเป็น 404 ทุกเส้น
     location /api {
-        proxy_set_header HOST $http_host;
+        proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X_Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_http_version 1.1;
         chunked_transfer_encoding off;
         proxy_buffering off;
         proxy_cache off;
-        rewrite ^/api/(.*)$ /$1 break;
         proxy_pass ${NGINX_PROXY};
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+    }
+
+    # ---- รูปที่อัปโหลด ----
+    # backend เสิร์ฟไว้ที่ /uploads/<filename> (ดู server.js)
+    # ถ้าไม่ proxy ตรงนี้ nginx จะ try_files ไปเจอ index.html แล้วรูปเสียทั้งหมด
+    location /uploads {
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_http_version 1.1;
+        proxy_pass ${NGINX_PROXY};
     }
 }

@@ -12,7 +12,7 @@ const borrowController = {
   // ===== ฝั่งผู้ยืม =====
 
   // POST /api/borrows   body: { equipmentId, dueDate }
-  create(req, res) {
+  async create(req, res) {
     const { equipmentId, dueDate } = req.body;
 
     if (!equipmentId) throw badRequest('กรุณาระบุอุปกรณ์');
@@ -20,7 +20,7 @@ const borrowController = {
       throw badRequest('กรุณาระบุวันครบกำหนดคืนในรูปแบบ YYYY-MM-DD');
     }
 
-    const item = equipmentModel.findById(equipmentId);
+    const item = await equipmentModel.findById(equipmentId);
     if (!item) throw notFound('ไม่พบอุปกรณ์');
 
     // ข้อความเดียวกับ mockApi
@@ -29,7 +29,7 @@ const borrowController = {
     const today = new Date().toISOString().slice(0, 10);
     if (dueDate < today) throw badRequest('วันครบกำหนดคืนต้องไม่ใช่วันที่ผ่านมาแล้ว');
 
-    const borrow = borrowModel.create({
+    const borrow = await borrowModel.create({
       equipmentId,
       borrowerId: req.user.id,   // แทน CURRENT_USER_ID
       dueDate
@@ -39,13 +39,13 @@ const borrowController = {
   },
 
   // GET /api/borrows/mine
-  listMine(req, res) {
-    res.json(borrowModel.listByBorrower(req.user.id));
+  async listMine(req, res) {
+    res.json(await borrowModel.listByBorrower(req.user.id));
   },
 
   // PUT /api/borrows/:id/request-return
-  requestReturn(req, res) {
-    const borrow = borrowModel.findById(req.params.id);
+  async requestReturn(req, res) {
+    const borrow = await borrowModel.findById(req.params.id);
     if (!borrow) throw notFound('ไม่พบรายการยืม');
 
     // ผู้ยืมแจ้งคืนได้เฉพาะรายการของตัวเอง (staff/admin ทำแทนได้)
@@ -55,48 +55,48 @@ const borrowController = {
 
     if (borrow.status !== 'approved') throw conflict('รายการนี้ยังไม่ได้อยู่ในสถานะยืม');
 
-    res.json(borrowModel.setStatus(borrow.id, 'returning'));
+    res.json(await borrowModel.setStatus(borrow.id, 'returning'));
   },
 
   // ===== ฝั่ง staff =====
 
   // GET /api/borrows
-  list(req, res) {
-    res.json(borrowModel.listAll());
+  async list(req, res) {
+    res.json(await borrowModel.listAll());
   },
 
   // PUT /api/borrows/:id/approve
-  approve(req, res) {
-    const borrow = borrowModel.findById(req.params.id);
+  async approve(req, res) {
+    const borrow = await borrowModel.findById(req.params.id);
     if (!borrow) throw notFound('ไม่พบรายการยืม');
     if (borrow.status !== 'pending') throw conflict('รายการนี้ไม่ได้รออนุมัติ');
 
-    const item = equipmentModel.findById(borrow.equipmentId);
+    const item = await equipmentModel.findById(borrow.equipmentId);
     if (item.available <= 0) throw conflict('อุปกรณ์หมดแล้ว ถูกอนุมัติให้คนอื่นไปก่อน');
 
     // ไม่ต้องแก้ equipment — available คำนวณจาก borrows อยู่แล้ว
-    res.json(borrowModel.setStatus(borrow.id, 'approved'));
+    res.json(await borrowModel.setStatus(borrow.id, 'approved'));
   },
 
   // PUT /api/borrows/:id/reject
-  reject(req, res) {
-    const borrow = borrowModel.findById(req.params.id);
+  async reject(req, res) {
+    const borrow = await borrowModel.findById(req.params.id);
     if (!borrow) throw notFound('ไม่พบรายการยืม');
     if (borrow.status !== 'pending') throw conflict('รายการนี้ไม่ได้รออนุมัติ');
 
-    res.json(borrowModel.setStatus(borrow.id, 'rejected'));
+    res.json(await borrowModel.setStatus(borrow.id, 'rejected'));
   },
 
   // PUT /api/borrows/:id/confirm-return
-  confirmReturn(req, res) {
-    const borrow = borrowModel.findById(req.params.id);
+  async confirmReturn(req, res) {
+    const borrow = await borrowModel.findById(req.params.id);
     if (!borrow) throw notFound('ไม่พบรายการยืม');
 
     if (borrow.status !== 'approved' && borrow.status !== 'returning') {
       throw conflict('รายการนี้ไม่ได้อยู่ระหว่างการยืม');
     }
 
-    res.json(borrowModel.markReturned(borrow.id));
+    res.json(await borrowModel.markReturned(borrow.id));
   }
 };
 

@@ -1,33 +1,33 @@
 // src/middleware/identity.js
 //
-// ยังไม่มี login จริง — middleware นี้ทำหน้าที่แทน CURRENT_USER_ID ใน mockApi.ts
-// และแทน RoleContext ฝั่ง frontend
+// ตัวตนมาจาก session cookie เท่านั้น (ตั้งโดย authController ตอน login สำเร็จ)
+// role อ่านจากฐานข้อมูลเสมอ — ไม่มี header ให้ override อีกแล้ว
 //
-// ระบบอ่านตัวตนจาก header:
-//   x-user-id : id ผู้ใช้ (ถ้าไม่ส่งมา ใช้ DEFAULT_USER_ID = 'u1' เหมือน mockApi)
-//   x-role    : role ที่ต้องการใช้ตรวจสิทธิ์ (ไม่ส่งก็ใช้ role จริงจาก DB)
-//
-// x-role มีไว้รองรับปุ่มสลับ role ใน RoleProvider ที่สลับได้อิสระจากตัวผู้ใช้
-// ตอนทำ login จริง: ลบ header พวกนี้ทิ้ง แล้วอ่าน req.user จาก JWT แทน
-// โดยที่ controller ทุกตัวไม่ต้องแก้เลย เพราะมันอ่านจาก req.user / req.role อยู่แล้ว
+// เดิมระบบอ่าน x-user-id / x-role จาก header ซึ่งแปลว่าใครก็ตาม
+// ส่ง `x-role: admin` มาก็ได้สิทธิ์เต็ม ตอนนี้เอาออกหมดแล้ว
 
-const userModel = require('../models/userModel');
-const { forbidden, notFound } = require('../utils/HttpError');
+const { authModel } = require('db');
+const { forbidden, unauthorized } = require('../utils/HttpError');
 
-const DEFAULT_USER_ID = process.env.DEFAULT_USER_ID || 'u1';
-const VALID_ROLES = ['user', 'staff', 'admin'];
+const SESSION_COOKIE = 'pf_session';
 
-function attachIdentity(req, res, next) {
-  const userId = req.header('x-user-id') || DEFAULT_USER_ID;
-  const user = userModel.findById(userId);
+async function attachIdentity(req, res, next) {
+  const token = req.cookies?.[SESSION_COOKIE];
 
-  if (!user) {
-    return next(notFound(`ไม่พบผู้ใช้ (x-user-id: ${userId})`));
+  if (!token) {
+    return next(unauthorized('กรุณาเข้าสู่ระบบ'));
   }
 
-  const headerRole = req.header('x-role');
+  const user = await authModel.findUserBySession(token);
+
+  if (!user) {
+    // session หมดอายุหรือถูกเพิกถอน — ล้างคุกกี้ทิ้งให้ด้วย
+    res.clearCookie(SESSION_COOKIE, { path: '/' });
+    return next(unauthorized('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'));
+  }
+
   req.user = user;
-  req.role = VALID_ROLES.includes(headerRole) ? headerRole : user.role;
+  req.role = user.role;   // มาจาก DB เท่านั้น
   next();
 }
 
@@ -41,4 +41,4 @@ function requireRole(...allowed) {
   };
 }
 
-module.exports = { attachIdentity, requireRole, DEFAULT_USER_ID };
+module.exports = { attachIdentity, requireRole, SESSION_COOKIE };

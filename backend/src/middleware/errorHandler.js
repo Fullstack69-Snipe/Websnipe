@@ -17,7 +17,14 @@ function errorHandler(err, req, res, next) {
   }
 
   const status = err.status || 500;
-  if (status >= 500) console.error(err);
+
+  // error ที่เราตั้งใจโยนเอง (มี status) ข้อความปลอดภัยพอจะส่งให้ผู้ใช้อ่าน
+  // ส่วน 500 มักเป็น error ดิบจากฐานข้อมูล/ไลบรารี ซึ่งอาจมีชื่อตาราง/คอลัมน์/SQL ติดมา
+  // จึง log ไว้ฝั่ง server แล้วตอบผู้ใช้แบบกลางๆ แทน
+  if (status >= 500) {
+    console.error(err);
+    return res.status(status).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
+  }
 
   res.status(status).json({ error: err.message || 'เกิดข้อผิดพลาดในระบบ' });
 }

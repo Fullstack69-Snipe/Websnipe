@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { mockApi } from '../lib/mockApi'
+import { api } from '../lib/api'
 import type { Equipment, EquipmentInput } from '../types'
 import EquipmentForm from '../components/EquipmentForm'
 
@@ -14,7 +14,7 @@ export default function ManageEquipment() {
 
   async function load() {
     try {
-      setItems(await mockApi.listEquipment())
+      setItems(await api.listEquipment())
     } catch {
       setError('โหลดรายการอุปกรณ์ไม่สำเร็จ')
     } finally {
@@ -29,9 +29,9 @@ export default function ManageEquipment() {
   async function handleSubmit(input: EquipmentInput) {
     try {
       if (editing === 'new') {
-        await mockApi.createEquipment(input)
+        await api.createEquipment(input)
       } else if (editing) {
-        await mockApi.updateEquipment(editing.id, input)
+        await api.updateEquipment(editing.id, input)
       }
       setEditing(null)
       await load()
@@ -43,7 +43,7 @@ export default function ManageEquipment() {
   async function handleDelete(item: Equipment) {
     if (!confirm(`ลบ "${item.name}" ออกจากระบบ?`)) return
     try {
-      await mockApi.deleteEquipment(item.id)
+      await api.deleteEquipment(item.id)
       await load()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'ลบไม่สำเร็จ')

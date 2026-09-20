@@ -2,7 +2,29 @@
 // ทดสอบทุก endpoint เทียบกับสัญญาที่ mockApi.ts กำหนดไว้
 // วิธีใช้:  npm run seed:reset && node src/server.js &  แล้ว  node db/smoke-test.js
 
+// รันจากเครื่องตัวเอง (นอก container) ให้ชี้ไป localhost ที่ compose เปิดพอร์ตไว้
+// ต้องตั้งก่อน require('db') เพราะ dotenv จะไม่ทับค่าที่มีอยู่แล้ว
+process.env.POSTGRES_HOST = process.env.POSTGRES_HOST || 'localhost';
+
+// อ้างไปที่ build ของแพ็กเกจ db ตรงๆ แทน require('db')
+// เพราะ pnpm คัดลอกแพ็กเกจแบบ file: ไว้ตอน install ถ้า rebuild db แล้วไม่ install ใหม่
+// สำเนานั้นจะเก่าค้าง เทสต์จะพังแบบงงๆ — อ้างตรงไปที่ dist ชัวร์กว่า
+const { authModel, dbConn } = require('../../db/dist/cjs/db/index.js');
+
 const BASE = process.env.BASE || 'http://localhost:3000/api';
+
+// ตอนนี้ระบบใช้ session cookie ไม่มี header x-user-id / x-role แล้ว
+// เทสต์จึงสร้าง session ตรงเข้าฐานข้อมูลแทนการเดินผ่าน OAuth จริง
+// (ไม่ได้เปิดช่องทางลัดใดๆ ใน backend — แค่ใช้สิทธิ์เข้าถึง DB ที่เทสต์มีอยู่แล้ว)
+const SESSION_FOR = { user: 'u1', staff: 'u2', admin: 'u3' };
+const cookies = {};
+
+async function createSessions() {
+  for (const [as, userId] of Object.entries(SESSION_FOR)) {
+    const { token } = await authModel.createSession(userId);
+    cookies[as] = `pf_session=${token}`;
+  }
+}
 
 let pass = 0, fail = 0;
 
@@ -11,10 +33,9 @@ function check(label, cond, extra = '') {
   else { fail++; console.log(`  FAIL ${label} ${extra}`); }
 }
 
-async function call(method, path, { body, userId = 'u1', role } = {}) {
-  const headers = { 'x-user-id': userId };
+async function call(method, path, { body, as = 'user' } = {}) {
+  const headers = { Cookie: cookies[as] };
   if (body) headers['Content-Type'] = 'application/json';
-  if (role) headers['x-role'] = role;
 
   const res = await fetch(`${BASE}${path}`, {
     method,
@@ -26,9 +47,10 @@ async function call(method, path, { body, userId = 'u1', role } = {}) {
   return { status: res.status, body: text ? JSON.parse(text) : null };
 }
 
-const STAFF = { role: 'staff' };
+const STAFF = { as: 'staff' };
 
 (async () => {
+  await createSessions();
   console.log('\n-- Equipment shape ตรงกับ type Equipment --');
   {
     const { body: list } = await call('GET', '/equipment');
@@ -63,7 +85,7 @@ const STAFF = { role: 'staff' };
     check('user เพิ่มอุปกรณ์ไม่ได้',
       (await call('POST', '/equipment', { body: { name: 'x', quantity: 1 } })).status === 403);
     check('user ดู /users ไม่ได้', (await call('GET', '/users')).status === 403);
-    check('admin ดู /users ได้', (await call('GET', '/users', { userId: 'u3' })).status === 200);
+    check('admin ดู /users ได้', (await call('GET', '/users', { as: 'admin' })).status === 200);
   }
 
   console.log('\n-- ข้อความ error ตรงกับ mockApi --');
@@ -150,17 +172,23 @@ const STAFF = { role: 'staff' };
 
   console.log('\n-- admin จัดการ role --');
   {
-    const r = await call('PUT', '/users/u4/role', { userId: 'u3', body: { role: 'staff' } });
+    const r = await call('PUT', '/users/u4/role', { as: 'admin', body: { role: 'staff' } });
     check('updateUserRole สำเร็จ', r.body.role === 'staff');
     check('field ตรงกับ type User', Object.keys(r.body).sort().join(',') === 'email,fullName,id,role');
-    await call('PUT', '/users/u4/role', { userId: 'u3', body: { role: 'user' } });
+    await call('PUT', '/users/u4/role', { as: 'admin', body: { role: 'user' } });
 
-    const bad = await call('PUT', '/users/u4/role', { userId: 'u3', body: { role: 'wizard' } });
+    const bad = await call('PUT', '/users/u4/role', { as: 'admin', body: { role: 'wizard' } });
     check('role ที่ไม่ถูกต้อง -> 400', bad.status === 400);
   }
 
   console.log(`\n${'='.repeat(46)}`);
   console.log(`ผ่าน ${pass} / ไม่ผ่าน ${fail}`);
   console.log('='.repeat(46));
+  // เก็บกวาด session ที่เทสต์สร้างไว้
+  for (const c of Object.values(cookies)) {
+    await authModel.deleteSession(c.replace('pf_session=', ''));
+  }
+  await dbConn.end();
+
   process.exit(fail > 0 ? 1 : 0);
 })();

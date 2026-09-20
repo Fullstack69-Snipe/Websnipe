@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
-import { mockApi } from '../lib/mockApi'
+import { api } from '../lib/api'
 import type { Borrow } from '../types'
 import StatusBadge from '../components/StatusBadge'
 
@@ -25,7 +25,7 @@ export default function BorrowRequests() {
 
   async function load() {
     try {
-      setBorrows(await mockApi.listBorrows())
+      setBorrows(await api.listBorrows())
     } catch {
       setError('โหลดรายการไม่สำเร็จ')
     } finally {
@@ -134,7 +134,7 @@ export default function BorrowRequests() {
                             <button
                               type="button"
                               aria-busy={busy}
-                              onClick={() => act(b.id, mockApi.approveBorrow)}
+                              onClick={() => act(b.id, api.approveBorrow)}
                             >
                               อนุมัติ
                             </button>
@@ -143,7 +143,7 @@ export default function BorrowRequests() {
                               className="outline secondary"
                               disabled={busy}
                               onClick={() =>
-                                act(b.id, mockApi.rejectBorrow, `ปฏิเสธคำขอของ ${b.borrowerName}?`)
+                                act(b.id, api.rejectBorrow, `ปฏิเสธคำขอของ ${b.borrowerName}?`)
                               }
                             >
                               ปฏิเสธ
@@ -156,7 +156,7 @@ export default function BorrowRequests() {
                             className="outline"
                             aria-busy={busy}
                             onClick={() =>
-                              act(b.id, mockApi.confirmReturn, `ยืนยันรับคืน "${b.equipmentName}"?`)
+                              act(b.id, api.confirmReturn, `ยืนยันรับคืน "${b.equipmentName}"?`)
                             }
                           >
                             รับคืน

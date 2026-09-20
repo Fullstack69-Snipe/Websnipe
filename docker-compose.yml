@@ -1,0 +1,101 @@
+# docker-compose.yml (root) — รันทั้งระบบด้วยไฟล์เดียว
+#
+#   docker compose up -d --build
+#   เปิด http://localhost:${NGINX_PORT}
+#
+# ไฟล์ compose ในโฟลเดอร์ย่อย (db/, backend/, frontend/) มีไว้รันทีละส่วนตอนพัฒนา
+# ถ้าจะรันทั้งระบบให้ใช้ไฟล์นี้
+name: preflight
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: pf-db
+    ports:
+      - ${POSTGRES_PORT}:5432
+    volumes:
+      # ชื่อ volume แยกจากของ backend ชัดเจน กันลบข้ามกัน
+      - pf-db-data:/var/lib/postgresql
+      - ./db/_entrypoint:/docker-entrypoint-initdb.d
+    environment:
+      - TZ=Asia/Bangkok
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_APP_USER=${POSTGRES_APP_USER}
+      - POSTGRES_APP_PASSWORD=${POSTGRES_APP_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks: [pf-net]
+    restart: unless-stopped
+
+  backend:
+    container_name: pf-backend
+    # context เป็น root เพราะ backend ใช้แพ็กเกจ db แบบ file:../db
+    # ต้องมีทั้งสองโฟลเดอร์อยู่ใน build context
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      - PORT=3000
+      - UPLOAD_DIR=/data/uploads
+      # ชี้ไปที่ service postgres ภายใน network (ไม่ใช่ localhost)
+      - POSTGRES_HOST=pf-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_APP_USER=${POSTGRES_APP_USER}
+      - POSTGRES_APP_PASSWORD=${POSTGRES_APP_PASSWORD}
+      # ใส่ข้อมูลตั้งต้นให้อัตโนมัติตอนบูตครั้งแรก (ข้ามถ้ามีข้อมูลแล้ว)
+      - RUN_SEED=true
+      # --- OAuth (ว่างไว้ = ปิดช่องทางนั้น ปุ่มบนหน้า sign-in จะไม่ขึ้น) ---
+      - APP_URL=${APP_URL}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
+      - SESSION_DAYS=${SESSION_DAYS}
+      - ADMIN_EMAILS=${ADMIN_EMAILS}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+    volumes:
+      # เก็บเฉพาะรูปที่อัปโหลด — ฐานข้อมูลอยู่ที่ postgres แล้ว
+      - pf-uploads:/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    networks: [pf-net]
+    restart: unless-stopped
+    # เปิดบรรทัดล่างถ้าต้องการยิง curl ทดสอบจากเครื่องตัวเอง
+    # ports:
+    #   - "3001:3000"
+
+  frontend:
+    container_name: pf-frontend
+    build: ./frontend
+    ports:
+      - ${NGINX_PORT}:6000
+    environment:
+      - NGINX_PROXY=${NGINX_PROXY}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [pf-net]
+    restart: unless-stopped
+
+networks:
+  pf-net:
+
+volumes:
+  pf-db-data:
+  pf-uploads:

@@ -16,6 +16,13 @@ import {
 // ตรงกับ Role / BorrowStatus ใน frontend/src/types.ts
 export const roleEnum = pgEnum("role", ["user", "staff", "admin"]);
 
+// ผู้ให้บริการ OAuth ที่รองรับ
+export const authProviderEnum = pgEnum("auth_provider", [
+  "google",
+  "github",
+  "discord",
+]);
+
 export const borrowStatusEnum = pgEnum("borrow_status", [
   "pending",
   "approved",
@@ -27,6 +34,7 @@ export const borrowStatusEnum = pgEnum("borrow_status", [
 // ตรงกับ Role / BorrowStatus ฝั่ง frontend แบบ 1:1
 export type Role = (typeof roleEnum.enumValues)[number];
 export type BorrowStatus = (typeof borrowStatusEnum.enumValues)[number];
+export type AuthProvider = (typeof authProviderEnum.enumValues)[number];
 
 // สถานะที่ถือว่า "ถือของอยู่" — pending ไม่นับ เพราะ staff อาจปฏิเสธ
 // ต้องตรงกับ HOLDING ใน backend/src/models/equipmentModel.js
@@ -40,6 +48,7 @@ export const usersTable = pgTable(
     email: varchar("email", { length: 255 }).notNull(),
     fullName: varchar("full_name", { length: 255 }).notNull(),
     role: roleEnum("role").notNull().default("user"),
+    avatarUrl: text("avatar_url"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -114,9 +123,82 @@ export const borrowsTable = pgTable(
   ],
 );
 
+// ---------- user_identities ----------
+// บัญชี OAuth ที่ผูกกับผู้ใช้หนึ่งคน (คนเดียวผูกได้ทั้ง google และ github)
+// แยกเป็นตารางต่างหากแทนการเก็บ provider ไว้ใน users เพื่อให้ผูกได้หลายเจ้า
+export const userIdentitiesTable = pgTable(
+  "user_identities",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    userId: varchar("user_id", { length: 64 })
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    provider: authProviderEnum("provider").notNull(),
+    // id ของผู้ใช้ฝั่งผู้ให้บริการ (google sub / github id) — เป็นค่าที่ไม่เปลี่ยน
+    // ต่างจาก email ที่ผู้ใช้เปลี่ยนเองได้ จึงใช้ตัวนี้เป็นกุญแจหลักในการจับคู่
+    providerAccountId: varchar("provider_account_id", { length: 255 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("user_identities_provider_account_unique").on(
+      table.provider,
+      table.providerAccountId,
+    ),
+    // ผูกผู้ให้บริการเจ้าหนึ่งได้บัญชีเดียวต่อผู้ใช้หนึ่งคน
+    uniqueIndex("user_identities_user_provider_unique").on(
+      table.userId,
+      table.provider,
+    ),
+  ],
+);
+
+// ---------- sessions ----------
+// เก็บ session ไว้ในฐานข้อมูล (ไม่ใช่ JWT) เพื่อให้ logout / ถอนสิทธิ์ได้จริง
+// คุกกี้ฝั่ง browser เก็บแค่ token ที่สุ่มมา ตัวข้อมูลอยู่ที่นี่ทั้งหมด
+export const sessionsTable = pgTable(
+  "sessions",
+  {
+    // token ที่อยู่ในคุกกี้ (สุ่ม 32 ไบต์ เข้ารหัส base64url)
+    id: varchar("id", { length: 128 }).primaryKey(),
+    userId: varchar("user_id", { length: 64 })
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_sessions_user").on(table.userId),
+    // ใช้ตอนกวาด session หมดอายุทิ้ง
+    index("idx_sessions_expires_at").on(table.expiresAt),
+  ],
+);
+
 // ---------- relations (สำหรับ dbClient.query.*.findMany({ with: ... })) ----------
 export const usersRelations = relations(usersTable, ({ many }) => ({
   borrows: many(borrowsTable),
+  identities: many(userIdentitiesTable),
+  sessions: many(sessionsTable),
+}));
+
+export const userIdentitiesRelations = relations(
+  userIdentitiesTable,
+  ({ one }) => ({
+    user: one(usersTable, {
+      fields: [userIdentitiesTable.userId],
+      references: [usersTable.id],
+    }),
+  }),
+);
+
+export const sessionsRelations = relations(sessionsTable, ({ one }) => ({
+  user: one(usersTable, {
+    fields: [sessionsTable.userId],
+    references: [usersTable.id],
+  }),
 }));
 
 export const equipmentRelations = relations(equipmentTable, ({ many }) => ({
@@ -141,3 +223,7 @@ export type Equipment = typeof equipmentTable.$inferSelect;
 export type NewEquipment = typeof equipmentTable.$inferInsert;
 export type Borrow = typeof borrowsTable.$inferSelect;
 export type NewBorrow = typeof borrowsTable.$inferInsert;
+export type UserIdentity = typeof userIdentitiesTable.$inferSelect;
+export type NewUserIdentity = typeof userIdentitiesTable.$inferInsert;
+export type Session = typeof sessionsTable.$inferSelect;
+export type NewSession = typeof sessionsTable.$inferInsert;

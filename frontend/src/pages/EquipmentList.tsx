@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
-import { mockApi } from '../lib/mockApi'
+import { api } from '../lib/api'
 import type { Equipment, EquipmentStatus } from '../types'
 import EquipmentCard from '../components/EquipmentCard'
 
@@ -20,7 +20,7 @@ export default function EquipmentList() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    mockApi
+    api
       .listEquipment()
       .then(setItems)
       .catch(() => setError('โหลดรายการอุปกรณ์ไม่สำเร็จ'))
@@ -38,7 +38,7 @@ export default function EquipmentList() {
     if (!target) return
     setSubmitting(true)
     try {
-      await mockApi.requestBorrow(target.id, dueDate)
+      await api.requestBorrow(target.id, dueDate)
       setTarget(null)
       alert('ส่งคำขอยืมเรียบร้อย รอเจ้าหน้าที่อนุมัติ')
     } catch (err) {

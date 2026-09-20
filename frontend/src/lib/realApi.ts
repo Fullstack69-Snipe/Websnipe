@@ -13,26 +13,13 @@ import type { Equipment, EquipmentInput, Borrow, User, Role } from '../types'
 
 const BASE = import.meta.env.VITE_API_BASE ?? '/api'
 
-// ยังไม่มี login — ส่งตัวตนผ่าน header ชั่วคราว (ตรงกับ middleware/identity.js)
-// พอทำ login จริงแล้ว ลบสองฟังก์ชันนี้ทิ้ง เปลี่ยนไปใส่ Authorization: Bearer <token>
-let currentUserId = localStorage.getItem('userId') ?? 'u1'
-let currentRole: Role | null = null
-
-export function setCurrentUserId(id: string) {
-  currentUserId = id
-  localStorage.setItem('userId', id)
-}
-
-// ให้ RoleProvider เรียกตอน setRole เพื่อให้ backend ตรวจสิทธิ์ตาม role ที่เลือกบนจอ
-export function setCurrentRole(role: Role | null) {
-  currentRole = role
-}
+// ตัวตนมาจากคุกกี้ session (httpOnly) ที่ backend ตั้งให้ตอน login สำเร็จ
+// ฝั่ง JS อ่านคุกกี้ไม่ได้และไม่จำเป็นต้องอ่าน — แค่ส่งไปกับทุก request
+// credentials: 'include' เผื่อกรณีรัน vite dev server คนละ origin กับ backend
+const CREDENTIALS: RequestCredentials = 'include'
 
 function headers(json = true): HeadersInit {
-  const h: Record<string, string> = { 'x-user-id': currentUserId }
-  if (json) h['Content-Type'] = 'application/json'
-  if (currentRole) h['x-role'] = currentRole
-  return h
+  return json ? { 'Content-Type': 'application/json' } : {}
 }
 
 // backend ตอบ error เป็น { error: "ข้อความภาษาไทย" } — โยนเป็น Error ให้ UI จับได้เหมือนเดิม
@@ -47,12 +34,13 @@ async function handle<T>(res: Response): Promise<T> {
 }
 
 const get = <T>(path: string) =>
-  fetch(`${BASE}${path}`, { headers: headers(false) }).then(handle<T>)
+  fetch(`${BASE}${path}`, { headers: headers(false), credentials: CREDENTIALS }).then(handle<T>)
 
 const send = <T>(method: string, path: string, body?: unknown) =>
   fetch(`${BASE}${path}`, {
     method,
     headers: headers(),
+    credentials: CREDENTIALS,
     body: body === undefined ? undefined : JSON.stringify(body),
   }).then(handle<T>)
 
@@ -94,8 +82,13 @@ export const realApi = {
 
   // ===== เพิ่มเติมจาก mockApi =====
 
-  // ผู้ใช้ปัจจุบัน — ใช้แทนค่าคงที่ CURRENT_USER_ID
+  // ผู้ใช้ปัจจุบันจาก session — 401 ถ้ายังไม่ได้เข้าสู่ระบบ
   me: () => get<User & { activeRole: Role }>('/me'),
+
+  // ช่องทาง login ที่เปิดใช้อยู่ (ตามที่ตั้ง env ไว้ฝั่ง backend)
+  authProviders: () => get<{ providers: { name: string; label: string }[] }>('/auth/providers'),
+
+  logout: () => send<void>('POST', '/auth/logout'),
 
   // อัปโหลดรูปจากเครื่อง แล้วเอา url ที่ได้ไปใส่เป็น imageUrl ตอน create/update
   async uploadImage(file: File): Promise<string> {
@@ -105,6 +98,7 @@ export const realApi = {
     const res = await fetch(`${BASE}/uploads`, {
       method: 'POST',
       headers: headers(false),   // ห้ามใส่ Content-Type เอง ให้ browser ใส่ boundary
+      credentials: CREDENTIALS,
       body: form,
     })
 

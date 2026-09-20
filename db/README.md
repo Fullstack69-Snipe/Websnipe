@@ -1,111 +1,148 @@
 # db
 
-ชั้นฐานข้อมูลของระบบยืม-คืนอุปกรณ์ — PostgreSQL + Drizzle ORM
+ชั้นฐานข้อมูลของระบบยืม-คืนอุปกรณ์ — PostgreSQL + [Drizzle ORM](https://orm.drizzle.team)
+
+แพ็กเกจนี้เป็นเจ้าของ schema, migration, ข้อมูลตั้งต้น และชั้น model ทั้งหมด
+[`backend/`](../backend/) เรียกใช้ผ่าน `require('db')` ไม่ได้เขียน SQL เอง
+
+---
 
 ## เริ่มใช้งาน
 
 ```bash
-cp .env.example .env     # แก้รหัสผ่านให้เรียบร้อยก่อน
+cp .env.example .env     # แก้รหัสผ่านก่อนใช้จริง
 pnpm install
-pnpm db:up               # ยก postgres ขึ้นด้วย docker compose
-pnpm db:generate         # สร้างไฟล์ migration จาก db/schema.ts
+pnpm db:up               # ยก postgres ด้วย docker compose
+pnpm db:generate         # สร้างไฟล์ migration จาก schema.ts
 pnpm db:migrate          # รัน migration ใส่ฐานข้อมูล
-pnpm db:seed             # ใส่ข้อมูลตั้งต้น (--reset เพื่อล้างก่อน)
+pnpm db:seed             # ใส่ข้อมูลตัวอย่าง (--reset เพื่อล้างก่อน)
 ```
 
-## คำสั่งที่มี
+> ถ้ารันทั้งระบบด้วย compose ที่ root ไม่ต้องทำขั้นตอนพวกนี้เอง —
+> backend รัน migration และ seed ให้ตอนบูต (ดู `backend/docker-entrypoint.sh`)
 
 | คำสั่ง | ทำอะไร |
 | --- | --- |
 | `pnpm db:up` / `db:down` | เปิด/ปิด container postgres |
 | `pnpm db:reset` | ลบ volume แล้วยกขึ้นใหม่ (ข้อมูลหายหมด) |
-| `pnpm db:generate` | อ่าน `db/schema.ts` สร้าง `.sql` ลง `db/migration` |
+| `pnpm db:generate` | อ่าน `db/schema.ts` แล้วสร้าง `.sql` ลง `db/migration` |
 | `pnpm db:migrate` | รัน migration ที่ยังไม่ได้รัน |
-| `pnpm db:push` | ยัด schema ลง DB ตรงๆ ไม่ผ่าน migration (ใช้ตอน prototype เท่านั้น) |
-| `pnpm db:studio` | เปิด Drizzle Studio ดูข้อมูลผ่านเบราว์เซอร์ |
-| `pnpm db:seed` | ใส่ข้อมูลตั้งต้น |
+| `pnpm db:push` | ยัด schema ลง DB ตรงๆ ข้าม migration (ใช้ตอน prototype เท่านั้น) |
+| `pnpm db:studio` | เปิด Drizzle Studio ดู/แก้ข้อมูลผ่านเบราว์เซอร์ |
+| `pnpm db:seed` | ใส่ข้อมูลตัวอย่าง |
+| `pnpm build` | build เป็น ESM + CommonJS ลง `dist/` (ต้องทำก่อน backend ใช้งาน) |
 | `pnpm typecheck` | ตรวจ TypeScript |
+
+---
 
 ## โครงสร้าง
 
-| ไฟล์ | หน้าที่ |
+```
+db/
+├── index.ts          จุดเข้าเดียวของแพ็กเกจ — backend import จากไฟล์นี้
+├── schema.ts         นิยามตาราง enum index constraint และ relations
+├── client.ts         คอนเนกชันและ dbClient
+├── utils.ts          ประกอบ connection string จาก env + ตรวจว่าตั้งค่าครบ
+├── migrate.ts        ตัวรัน migration
+├── seed.ts           ข้อมูลตัวอย่าง
+├── prototype.ts      สคริปต์ไว้ลองเขียน query
+├── migration/        ไฟล์ .sql ที่ drizzle-kit สร้าง (commit ไว้ในรีโป)
+└── models/
+    ├── authModel.ts      login ด้วย OAuth, จับคู่บัญชี, จัดการ session
+    ├── userModel.ts      ผู้ใช้และสิทธิ์
+    ├── equipmentModel.ts อุปกรณ์ + คำนวณ available
+    ├── borrowModel.ts    รายการยืม
+    └── helpers.ts        ตัวช่วยที่ใช้ร่วมกัน
+
+_entrypoint/init.sh   สร้าง app user + schema drizzle ตอน container เกิดครั้งแรก
+```
+
+---
+
+## ตาราง
+
+| ตาราง | เก็บอะไร |
 | --- | --- |
-| `db/index.ts` | จุดเข้าเดียวของแพ็กเกจ — ฝั่ง backend import จากไฟล์นี้ |
-| `db/schema.ts` | นิยามตาราง `users` / `equipment` / `borrows` + enum + relations |
-| `db/models/` | ชั้น model หน้าตาเดียวกับ `backend/src/models/*.js` |
-| `db/client.ts` | คอนเนกชันและ `dbClient` ที่ไฟล์อื่นเรียกใช้ |
-| `db/utils.ts` | ประกอบ connection string จาก env + ตรวจว่าตั้งค่าครบ |
-| `db/migrate.ts` | ตัวรัน migration |
-| `db/seed.ts` | ข้อมูลตั้งต้น |
-| `db/prototype.ts` | สคริปต์ทดลองเขียน query |
-| `_entrypoint/init.sh` | สร้าง app user + schema `drizzle` ตอน container เกิดครั้งแรก |
+| `users` | ผู้ใช้ + role (`user` / `staff` / `admin`) |
+| `user_identities` | บัญชี OAuth ที่ผูกไว้ — คนเดียวผูกได้หลายผู้ให้บริการ |
+| `sessions` | session ที่ยังไม่หมดอายุ (คุกกี้เก็บแค่ token) |
+| `equipment` | อุปกรณ์และจำนวนทั้งหมดที่มี |
+| `borrows` | รายการยืม หนึ่งแถว = อุปกรณ์หนึ่งชิ้น |
 
-## หมายเหตุเรื่อง schema
+### สิ่งที่ตั้งใจออกแบบไว้แบบนี้
 
-- **ตาราง `equipment` ไม่มีคอลัมน์ `available`** — จำนวนคงเหลือคำนวณสดจาก
-  `quantity - (จำนวน borrows ที่สถานะอยู่ใน HOLDING_STATUSES)` ทุกครั้ง
-  เพื่อไม่ให้ข้อมูลไม่ตรงกันจากการเก็บตัวเลขซ้ำสองที่ ดูตัวอย่าง query ใน `db/prototype.ts`
-- `HOLDING_STATUSES` (`approved`, `returning`) export จาก `schema.ts` เพื่อให้ทุกที่ใช้ค่าชุดเดียวกัน
-  — `pending` ไม่นับ เพราะ staff อาจปฏิเสธ
-- FK เป็น `ON DELETE RESTRICT` ทั้งคู่ ลบอุปกรณ์ที่ยังมีประวัติการยืมค้างไม่ได้
-  ต้องเคลียร์ `borrows` ก่อน
+- **`equipment` ไม่มีคอลัมน์ `available`** — คำนวณสดทุกครั้งจาก
+  `quantity - (จำนวน borrows ที่สถานะอยู่ใน HOLDING_STATUSES)`
+  เก็บตัวเลขซ้ำสองที่แล้วมันจะไม่ตรงกันเมื่อไหร่ก็ได้
+- `HOLDING_STATUSES` (`approved`, `returning`) export จาก `schema.ts` ให้ทุกที่ใช้ค่าชุดเดียวกัน
+  — `pending` ไม่นับ เพราะเจ้าหน้าที่อาจปฏิเสธ
+- **ไม่มีสถานะ "เกินกำหนด"** — คำนวณจาก `approved` + `dueDate < วันนี้`
+- FK ของ `borrows` เป็น `ON DELETE RESTRICT` ทั้งคู่ ลบอุปกรณ์หรือผู้ใช้ที่ยังมีรายการค้างไม่ได้
+  ส่วน `user_identities` กับ `sessions` เป็น `CASCADE` (ลบผู้ใช้แล้วตามไปหมด)
+- อีเมลใน `users` unique แบบไม่สนตัวพิมพ์ (`lower(email)`)
+- มี CHECK บังคับว่า `returned_at` มีค่าได้เฉพาะตอน status เป็น `returned`
+  และ `quantity` ห้ามติดลบ
+
+---
 
 ## ใช้จากฝั่ง backend
 
-`db/` build ออกมาสองแบบ ESM (`dist/db`) และ CommonJS (`dist/cjs/db`)
-ฝั่ง backend เป็น `"type": "commonjs"` จึง `require()` ได้ตรงๆ
+build ออกมาสองแบบ: ESM (`dist/db`) และ CommonJS (`dist/cjs/db`)
+backend เป็น `type: commonjs` จึง `require()` ได้ตรงๆ
 
 ```bash
-pnpm build          # ต้อง build ก่อนใช้งานจากที่อื่น
-```
-
-```jsonc
-// backend/package.json — เพิ่ม dependency แบบ path
-"dependencies": {
-  "db": "file:../db"
-}
+pnpm build          # ต้อง build ก่อนให้ที่อื่นใช้งาน
 ```
 
 ```js
-const { equipmentModel, borrowModel, userModel } = require('db');
-```
+const { equipmentModel, borrowModel, userModel, authModel } = require('db');
 
-ชื่อฟังก์ชันและหน้าตาข้อมูลที่คืนกลับ ตรงกับ `backend/src/models/*.js` เดิมทุกตัว
+const items = await equipmentModel.listAll();   // ทุกฟังก์ชันเป็น async
+```
 
 | model | ฟังก์ชัน |
 | --- | --- |
 | `userModel` | `listAll` `findById` `setRole` |
-| `equipmentModel` | `listAll` `findById` `borrowedCount` `create` `update` `remove` + `HOLDING` |
+| `equipmentModel` | `listAll` `findById` `borrowedCount` `create` `update` `remove` |
 | `borrowModel` | `listAll` `listByBorrower` `findById` `create` `setStatus` `markReturned` |
+| `authModel` | `findOrCreateFromOAuth` `createSession` `findUserBySession` `deleteSession` `deleteExpiredSessions` |
 
-สิ่งที่รับประกันว่าเหมือนเดิม:
+สิ่งที่ชั้นนี้รับประกันให้:
 
 - คีย์เป็น camelCase ตรงกับ `frontend/src/types.ts`
-- `findById` คืน `undefined` เมื่อไม่พบ (ไม่ใช่ `null`) — controller ที่เช็ค `if (!item)` ใช้ได้เลย
-- `equipment` มี `available` ที่คำนวณมาแล้วติดมาด้วยทุกแถว
-- `createdAt` / `returnedAt` เป็น ISO string ไม่ใช่ Date object
-- `equipmentModel.remove()` คืนจำนวน borrows ที่ถูกลบไป
+- `findById` คืน `undefined` เมื่อไม่พบ (ไม่ใช่ `null`)
+- อุปกรณ์ทุกแถวมี `available` ที่คำนวณมาแล้ว
+- `createdAt` / `returnedAt` เป็น ISO string ไม่ใช่ `Date` object
 
-**จุดเดียวที่ backend ต้องแก้: ทุกฟังก์ชันเป็น async** เพราะไดรเวอร์ Postgres
-ไม่มีโหมด synchronous แบบ better-sqlite3 — ต้องเติม `await` ที่ทุกจุดที่เรียก
-แล้วทำ controller เป็น `async` ตาม (`wrap()` ที่มีอยู่แล้วรองรับ promise อยู่)
+> **ถ้าแก้โค้ดใน `db/` แล้ว backend ยังเห็นของเก่า** ให้รัน `pnpm build` ใหม่
+> เพราะ backend ใช้ผลลัพธ์ใน `dist/` ไม่ได้อ่าน `.ts` ตรงๆ
 
-```js
-// เดิม
-const item = equipmentModel.findById(id);
-// ใหม่
-const item = await equipmentModel.findById(id);
+---
+
+## เพิ่ม/แก้ schema
+
+```bash
+# 1. แก้ db/schema.ts
+# 2. สร้าง migration แล้วอ่าน .sql ที่ได้ก่อนเสมอ
+pnpm db:generate
+# 3. รันใส่ฐานข้อมูล
+pnpm db:migrate
+# 4. build ให้ backend เห็น type ใหม่
+pnpm build
 ```
 
-> `setStatus(id, 'returned')` ต่างจากเวอร์ชัน SQLite เล็กน้อย: จะเซ็ต `returnedAt` ให้ด้วย
-> เพราะ schema ฝั่ง Postgres มี CHECK บังคับว่า `returned_at` มีค่าได้เฉพาะตอน status เป็น
-> `returned` — controller ปัจจุบันเรียกผ่าน `markReturned` อยู่แล้วจึงไม่กระทบ
+ไฟล์ใน `db/migration/` commit ลงรีโปด้วย — เป็นบันทึกว่า schema เปลี่ยนมายังไง
+ถ้าไม่ commit ทุกคนจะได้ฐานข้อมูลหน้าตาไม่เหมือนกัน
 
-## ยังไม่ได้ทำ
+---
 
-- `_entrypoint/init.sh` ให้สิทธิ์ `GRANT ALL ON DATABASE` กับ app user ซึ่งกว้างเกินจำเป็น
-  สำหรับ production ควรลดเหลือเฉพาะสิทธิ์ที่ใช้จริง
-- ตาราง `users` ยังไม่มีคอลัมน์สำหรับ authentication (password hash / provider id)
-  เพราะระบบยังใช้ header `x-user-id` แทน login จริง
-- หนึ่งแถวใน `borrows` = ยืมหนึ่งชิ้น ถ้าต้องการยืมหลายชิ้นในรายการเดียว
-  ต้องเพิ่มคอลัมน์ `quantity` แล้วแก้การนับจาก `COUNT(*)` เป็น `SUM(quantity)`
+## ข้อควรรู้
+
+- `_entrypoint/init.sh` รันเฉพาะตอน data directory ว่างเท่านั้น
+  แก้ไฟล์นี้แล้วต้อง `pnpm db:reset` ถึงจะมีผล
+- สคริปต์ต้องเป็น LF — ถ้าเป็น CRLF จะพังใน container แบบเงียบๆ
+  (`/bin/bash^M: bad interpreter`) มี `.gitattributes` กันไว้แล้ว
+- `init.sh` ให้สิทธิ์ `GRANT ALL ON DATABASE` กับ app user ซึ่งกว้างเกินจำเป็น
+  ถ้าจะขึ้น production ควรลดให้เหลือเท่าที่ใช้จริง
+- หนึ่งแถวใน `borrows` = ยืมหนึ่งชิ้น ถ้าจะให้ยืมหลายชิ้นในรายการเดียว
+  ต้องเพิ่มคอลัมน์ `quantity` แล้วเปลี่ยนการนับจาก `COUNT(*)` เป็น `SUM(quantity)`

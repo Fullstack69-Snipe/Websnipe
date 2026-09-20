@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { useRole } from '../lib/useRole'
+import { useAuth } from '../lib/useAuth'
+import { ROLE_LABEL } from '../lib/labels'
 import type { Role } from '../types'
 
 const MENU: { to: string; label: string; allow: Role[] }[] = [
@@ -11,7 +12,7 @@ const MENU: { to: string; label: string; allow: Role[] }[] = [
 ]
 
 export default function Layout() {
-  const { role, setRole } = useRole()
+  const { user, role, signOut } = useAuth()
 
   return (
     <>
@@ -22,22 +23,26 @@ export default function Layout() {
           </li>
         </ul>
         <ul>
-          {MENU.filter((m) => m.allow.includes(role)).map((m) => (
+          {MENU.filter((m) => role && m.allow.includes(role)).map((m) => (
             <li key={m.to}>
               <NavLink to={m.to}>{m.label}</NavLink>
             </li>
           ))}
+
+          {/* เดิมตรงนี้เป็น select สลับ role สำหรับทดสอบ — ตอนนี้ role มาจากบัญชีที่ login */}
+          <li className="user-menu">
+            {user?.avatarUrl && (
+              <img className="avatar" src={user.avatarUrl} alt="" width={28} height={28} />
+            )}
+            <span>
+              {user?.fullName}
+              {role && <small> ({ROLE_LABEL[role]})</small>}
+            </span>
+          </li>
           <li>
-            {/* ชั่วคราว — ลบทิ้งตอนทำ login จริง */}
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as Role)}
-              aria-label="สลับ role สำหรับทดสอบ"
-            >
-              <option value="user">ผู้ยืม</option>
-              <option value="staff">เจ้าหน้าที่</option>
-              <option value="admin">ผู้ดูแลระบบ</option>
-            </select>
+            <button type="button" className="outline secondary" onClick={() => void signOut()}>
+              ออกจากระบบ
+            </button>
           </li>
         </ul>
       </nav>

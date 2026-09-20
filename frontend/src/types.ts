@@ -7,6 +7,7 @@ export type User = {
   email: string
   fullName: string
   role: Role
+  avatarUrl?: string | null
 }
 
 export type Equipment = {

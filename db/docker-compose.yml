@@ -6,7 +6,7 @@ services:
     ports:
       - ${POSTGRES_PORT}:5432
     volumes:
-      - pf-data:/var/lib/postgresql
+      - pf-db-data:/var/lib/postgresql
       - ./_entrypoint:/docker-entrypoint-initdb.d
     environment:
       - TZ=Asia/Bangkok
@@ -26,6 +26,6 @@ services:
       retries: 10
       start_period: 10s
 volumes:
-  pf-data:
+  pf-db-data:
 networks:
   pf-net:

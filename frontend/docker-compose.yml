@@ -1,14 +1,21 @@
-name: preflight # You can also change this to another name to avoid warning with existing group.
+# frontend/docker-compose.yml — รันเฉพาะ frontend ตอนพัฒนา
+#
+# ต้องมี network preflight_pf-net และ pf-backend อยู่ก่อน
+# ถ้าจะรันทั้งระบบ ใช้ docker-compose.yml ที่ root แทนไฟล์นี้
+name: preflight
+
 services:
   frontend:
     container_name: pf-frontend
     build: .
     ports:
       - ${NGINX_PORT}:6000
-    networks:
-      - preflight_pf-net
     environment:
       - NGINX_PROXY=${NGINX_PROXY}
+    networks:
+      - preflight_pf-net
+    restart: unless-stopped
+
 networks:
-  preflight_pf-net: # Check by using `docker network ls` command
+  preflight_pf-net:
     external: true
