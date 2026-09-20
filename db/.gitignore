@@ -1,5 +1,4 @@
 .env
 .npmrc
 node_modules/
-migration/
 dist/

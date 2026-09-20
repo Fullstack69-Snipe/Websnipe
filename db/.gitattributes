@@ -1,0 +1,9 @@
+# init.sh ถูกรันในคอนเทนเนอร์ Linux ถ้า checkout ออกมาเป็น CRLF
+# shebang จะกลายเป็น /bin/bash\r แล้วพังทันทีแบบเงียบๆ
+# (entrypoint ข้ามไป ไม่สร้าง app user ไปโผล่เป็น auth error ตอน migrate)
+*.sh text eol=lf
+
+# ไฟล์ที่คอนเทนเนอร์อ่านด้วย บังคับ LF ไว้ให้เหมือนกัน
+*.yml text eol=lf
+*.yaml text eol=lf
+.env.example text eol=lf

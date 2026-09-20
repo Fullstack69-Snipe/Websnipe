@@ -14,8 +14,21 @@ const dbName = process.env.POSTGRES_DB;
 //   dbName,
 // });
 
-if (!dbUser || !dbPassword || !dbHost || !dbName || !dbName) {
-  throw new Error("Invalid DB env.");
+const missing = Object.entries({
+  POSTGRES_APP_USER: dbUser,
+  POSTGRES_APP_PASSWORD: dbPassword,
+  POSTGRES_HOST: dbHost,
+  POSTGRES_PORT: dbPort,
+  POSTGRES_DB: dbName,
+})
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
+
+if (missing.length > 0) {
+  throw new Error(
+    `Invalid DB env. ตัวแปรที่ยังไม่ได้ตั้งค่า: ${missing.join(", ")} (ดูตัวอย่างใน .env.example)`,
+  );
 }
 
-export const connectionString = `postgres://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}`;
+// encode เผื่อรหัสผ่านมีอักขระพิเศษ (@ : / ?) ที่จะทำให้ URL เพี้ยน
+export const connectionString = `postgres://${encodeURIComponent(dbUser!)}:${encodeURIComponent(dbPassword!)}@${dbHost}:${dbPort}/${dbName}`;

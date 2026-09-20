@@ -1,0 +1,15 @@
+// build เวอร์ชัน CommonJS สำหรับให้ backend (type: commonjs) require() ได้
+// ตัว preset @tsconfig/node-ts เปิด verbatimModuleSyntax ไว้ซึ่งห้าม emit ESM syntax
+// ออกมาเป็น CJS จึงต้องปิดทับที่นี่
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": false,
+    "rewriteRelativeImportExtensions": false,
+    "outDir": "./dist/cjs"
+  },
+  "include": ["./db/**/*"],
+  "exclude": ["./db/prototype.ts", "./db/seed.ts", "./db/migrate.ts"]
+}

@@ -17,6 +17,14 @@ services:
       - POSTGRES_APP_PASSWORD=${POSTGRES_APP_PASSWORD}
     networks:
       - pf-net
+    restart: unless-stopped
+    # กัน db:migrate / db:seed รันก่อน postgres พร้อมรับคอนเนกชัน
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 volumes:
   pf-data:
 networks:

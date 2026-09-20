@@ -1,48 +1,71 @@
-import { eq, like } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import { dbClient, dbConn } from "@db/client.js";
-import { todoTable } from "@db/schema.js";
+import {
+  HOLDING_STATUSES,
+  borrowsTable,
+  equipmentTable,
+  usersTable,
+} from "@db/schema.js";
 
-async function insertData() {
-  await dbClient.insert(todoTable).values({
-    todoText: "Finish reading",
-  });
-  dbConn.end();
-}
-
-async function queryData() {
-  const results = await dbClient.query.todoTable.findMany();
-
-  // const results = await dbClient.query.todoTable.findMany({
-  //   where: like(todoTable.todoText, "%reading%"),
-  // });
-  console.log(results);
-  dbConn.end();
-}
-
-async function updateData() {
-  const results = await dbClient.query.todoTable.findMany();
-  if (results.length === 0) dbConn.end();
-
-  const id = results[0].id;
-  await dbClient
-    .update(todoTable)
-    .set({
-      todoText: "AAA",
+// รายการอุปกรณ์พร้อม available (quantity - จำนวนที่ถือของอยู่)
+// เทียบเท่า SELECT_WITH_AVAILABLE ใน backend/src/models/equipmentModel.js
+async function listEquipment() {
+  const results = await dbClient
+    .select({
+      id: equipmentTable.id,
+      name: equipmentTable.name,
+      description: equipmentTable.description,
+      imageUrl: equipmentTable.imageUrl,
+      quantity: equipmentTable.quantity,
+      available: sql<number>`${equipmentTable.quantity} - (
+        SELECT COUNT(*) FROM ${borrowsTable}
+        WHERE ${borrowsTable.equipmentId} = ${equipmentTable.id}
+          AND ${inArray(borrowsTable.status, [...HOLDING_STATUSES])}
+      )`.mapWith(Number),
     })
-    .where(eq(todoTable.id, id));
-  dbConn.end();
+    .from(equipmentTable)
+    .orderBy(equipmentTable.createdAt);
+
+  console.log(results);
 }
 
-async function deleteData() {
-  const results = await dbClient.query.todoTable.findMany();
-  if (results.length === 0) dbConn.end();
+// รายการยืมพร้อมชื่ออุปกรณ์/ชื่อผู้ยืม ใหม่สุดขึ้นก่อน
+async function listBorrows() {
+  const results = await dbClient.query.borrowsTable.findMany({
+    with: {
+      equipment: { columns: { name: true } },
+      borrower: { columns: { fullName: true } },
+    },
+    orderBy: desc(borrowsTable.createdAt),
+  });
 
-  const id = results[0].id;
-  await dbClient.delete(todoTable).where(eq(todoTable.id, id));
-  dbConn.end();
+  console.log(results);
 }
 
-// insertData();
-queryData();
-// updateData();
-// deleteData();
+async function listPendingByBorrower(borrowerId: string) {
+  const results = await dbClient
+    .select()
+    .from(borrowsTable)
+    .where(eq(borrowsTable.borrowerId, borrowerId));
+
+  console.log(results);
+}
+
+async function listStaff() {
+  const results = await dbClient
+    .select()
+    .from(usersTable)
+    .where(inArray(usersTable.role, ["staff", "admin"]));
+
+  console.log(results);
+}
+
+async function main() {
+  await listEquipment();
+  // await listBorrows();
+  // await listPendingByBorrower("u1");
+  // await listStaff();
+  await dbConn.end();
+}
+
+main();
