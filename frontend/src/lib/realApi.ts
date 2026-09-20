@@ -1,4 +1,4 @@
-import type { Equipment, EquipmentInput, Borrow, User, Role } from '../types'
+import type { Equipment, EquipmentInput, Borrow, EquipmentLog, User, Role } from '../types'
 
 // ===================================================================
 // เรียก backend จริง — ชื่อฟังก์ชันและ signature เหมือน mockApi.ts ทุกตัว
@@ -56,8 +56,8 @@ export const realApi = {
   deleteEquipment: (id: string) => send<void>('DELETE', `/equipment/${id}`),
 
   // ===== การยืม — ฝั่งผู้ยืม =====
-  requestBorrow: (equipmentId: string, dueDate: string) =>
-    send<Borrow>('POST', '/borrows', { equipmentId, dueDate }),
+  requestBorrow: (equipmentId: string, dueDate: string, purpose?: string) =>
+    send<Borrow>('POST', '/borrows', { equipmentId, dueDate, purpose }),
 
   listMyBorrows: () => get<Borrow[]>('/borrows/mine'),
 
@@ -69,10 +69,15 @@ export const realApi = {
 
   approveBorrow: (borrowId: string) => send<Borrow>('PUT', `/borrows/${borrowId}/approve`),
 
-  rejectBorrow: (borrowId: string) => send<Borrow>('PUT', `/borrows/${borrowId}/reject`),
+  rejectBorrow: (borrowId: string, reason?: string) =>
+    send<Borrow>('PUT', `/borrows/${borrowId}/reject`, { reason }),
 
-  confirmReturn: (borrowId: string) =>
-    send<Borrow>('PUT', `/borrows/${borrowId}/confirm-return`),
+  confirmReturn: (borrowId: string, note?: string) =>
+    send<Borrow>('PUT', `/borrows/${borrowId}/confirm-return`, { note }),
+
+  // ประวัติของอุปกรณ์ชิ้นหนึ่ง (staff, admin)
+  equipmentLogs: (equipmentId: string) =>
+    get<EquipmentLog[]>(`/equipment/${equipmentId}/logs`),
 
   // ===== ผู้ใช้ — ฝั่ง admin =====
   listUsers: () => get<User[]>('/users'),

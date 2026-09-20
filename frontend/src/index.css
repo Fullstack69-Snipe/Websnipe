@@ -70,3 +70,35 @@
   border-radius: 50%;
   object-fit: cover;
 }
+
+/* บรรทัดรายละเอียดเสริมใต้ชื่อในตาราง (เหตุผลขอยืม, ผู้อนุมัติ, สภาพตอนคืน) */
+.muted-line {
+  display: block;
+  color: var(--pico-muted-color);
+  line-height: 1.4;
+}
+
+/* ---------- ประวัติอุปกรณ์ ---------- */
+.history__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.history__list li {
+  padding-block: 0.6rem;
+  border-block-end: 1px solid var(--pico-muted-border-color);
+}
+
+.history__list li:last-child {
+  border-block-end: none;
+}
+
+.history__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}

@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  bigserial,
   check,
   date,
   index,
@@ -23,6 +24,18 @@ export const authProviderEnum = pgEnum("auth_provider", [
   "discord",
 ]);
 
+// การกระทำที่บันทึกลง equipment_logs
+export const logActionEnum = pgEnum("log_action", [
+  "equipment_created",
+  "equipment_updated",
+  "equipment_deleted",
+  "borrow_requested",
+  "borrow_approved",
+  "borrow_rejected",
+  "borrow_return_requested",
+  "borrow_returned",
+]);
+
 export const borrowStatusEnum = pgEnum("borrow_status", [
   "pending",
   "approved",
@@ -35,6 +48,7 @@ export const borrowStatusEnum = pgEnum("borrow_status", [
 export type Role = (typeof roleEnum.enumValues)[number];
 export type BorrowStatus = (typeof borrowStatusEnum.enumValues)[number];
 export type AuthProvider = (typeof authProviderEnum.enumValues)[number];
+export type LogAction = (typeof logActionEnum.enumValues)[number];
 
 // สถานะที่ถือว่า "ถือของอยู่" — pending ไม่นับ เพราะ staff อาจปฏิเสธ
 // ต้องตรงกับ HOLDING ใน backend/src/models/equipmentModel.js
@@ -104,6 +118,23 @@ export const borrowsTable = pgTable(
     // วันครบกำหนดคืน เก็บเป็นวันที่ล้วน (ไม่มีเวลา) ตาม dueDate ใน types.ts → 'YYYY-MM-DD'
     dueDate: date("due_date").notNull(),
     status: borrowStatusEnum("status").notNull().default("pending"),
+    purpose: text("purpose"),
+
+    // ใครอนุมัติ/ปฏิเสธ และเมื่อไหร่ — เดิมไม่ได้เก็บเลย ตามตัวไม่ได้ว่าใครกดอะไร
+    approvedBy: varchar("approved_by", { length: 64 }).references(
+      () => usersTable.id,
+      { onDelete: "restrict" },
+    ),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    rejectReason: text("reject_reason"),
+
+    // ใครเป็นคนรับคืน และสภาพของตอนคืน
+    receivedBy: varchar("received_by", { length: 64 }).references(
+      () => usersTable.id,
+      { onDelete: "restrict" },
+    ),
+    returnNote: text("return_note"),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -177,6 +208,55 @@ export const sessionsTable = pgTable(
   ],
 );
 
+// ---------- equipment_logs ----------
+// ประวัติการเปลี่ยนแปลงทั้งหมด ตอบโจทย์ "ไม่มีประวัติ ตามของคืนยาก"
+//
+// เก็บชื่ออุปกรณ์/ชื่อผู้ทำไว้ซ้ำในแถว (denormalize) โดยตั้งใจ
+// เพราะ log ต้องอ่านรู้เรื่องแม้อุปกรณ์ถูกลบไปแล้ว ถ้าพึ่ง JOIN อย่างเดียว
+// พอลบอุปกรณ์ทิ้ง ประวัติจะกลายเป็นแถวว่างที่ไม่มีความหมาย
+//
+// FK จึงเป็น SET NULL ไม่ใช่ CASCADE — ลบของได้ แต่ประวัติยังอยู่
+export const equipmentLogsTable = pgTable(
+  "equipment_logs",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+
+    equipmentId: varchar("equipment_id", { length: 64 }).references(
+      () => equipmentTable.id,
+      { onDelete: "set null" },
+    ),
+    equipmentName: varchar("equipment_name", { length: 255 }).notNull(),
+
+    borrowId: varchar("borrow_id", { length: 64 }).references(
+      () => borrowsTable.id,
+      { onDelete: "set null" },
+    ),
+
+    actorId: varchar("actor_id", { length: 64 }).references(
+      () => usersTable.id,
+      { onDelete: "set null" },
+    ),
+    actorName: varchar("actor_name", { length: 255 }).notNull(),
+
+    action: logActionEnum("action").notNull(),
+
+    // สถานะก่อน/หลัง ใส่เฉพาะ action ที่เป็นการเปลี่ยนสถานะการยืม
+    fromStatus: borrowStatusEnum("from_status"),
+    toStatus: borrowStatusEnum("to_status"),
+
+    note: text("note"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_log_equipment").on(table.equipmentId),
+    index("idx_log_created_at").on(table.createdAt.desc()),
+    index("idx_log_borrow").on(table.borrowId),
+  ],
+);
+
 // ---------- relations (สำหรับ dbClient.query.*.findMany({ with: ... })) ----------
 export const usersRelations = relations(usersTable, ({ many }) => ({
   borrows: many(borrowsTable),
@@ -203,7 +283,26 @@ export const sessionsRelations = relations(sessionsTable, ({ one }) => ({
 
 export const equipmentRelations = relations(equipmentTable, ({ many }) => ({
   borrows: many(borrowsTable),
+  logs: many(equipmentLogsTable),
 }));
+
+export const equipmentLogsRelations = relations(
+  equipmentLogsTable,
+  ({ one }) => ({
+    equipment: one(equipmentTable, {
+      fields: [equipmentLogsTable.equipmentId],
+      references: [equipmentTable.id],
+    }),
+    borrow: one(borrowsTable, {
+      fields: [equipmentLogsTable.borrowId],
+      references: [borrowsTable.id],
+    }),
+    actor: one(usersTable, {
+      fields: [equipmentLogsTable.actorId],
+      references: [usersTable.id],
+    }),
+  }),
+);
 
 export const borrowsRelations = relations(borrowsTable, ({ one }) => ({
   equipment: one(equipmentTable, {
@@ -227,3 +326,5 @@ export type UserIdentity = typeof userIdentitiesTable.$inferSelect;
 export type NewUserIdentity = typeof userIdentitiesTable.$inferInsert;
 export type Session = typeof sessionsTable.$inferSelect;
 export type NewSession = typeof sessionsTable.$inferInsert;
+export type EquipmentLog = typeof equipmentLogsTable.$inferSelect;
+export type NewEquipmentLog = typeof equipmentLogsTable.$inferInsert;

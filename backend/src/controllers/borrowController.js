@@ -29,11 +29,15 @@ const borrowController = {
     const today = new Date().toISOString().slice(0, 10);
     if (dueDate < today) throw badRequest('วันครบกำหนดคืนต้องไม่ใช่วันที่ผ่านมาแล้ว');
 
-    const borrow = await borrowModel.create({
-      equipmentId,
-      borrowerId: req.user.id,   // แทน CURRENT_USER_ID
-      dueDate
-    });
+    const borrow = await borrowModel.create(
+      {
+        equipmentId,
+        borrowerId: req.user.id,
+        dueDate,
+        purpose: typeof req.body.purpose === 'string' ? req.body.purpose.trim() || null : null
+      },
+      req.user
+    );
 
     res.status(201).json(borrow);
   },
@@ -55,7 +59,7 @@ const borrowController = {
 
     if (borrow.status !== 'approved') throw conflict('รายการนี้ยังไม่ได้อยู่ในสถานะยืม');
 
-    res.json(await borrowModel.setStatus(borrow.id, 'returning'));
+    res.json(await borrowModel.setStatus(borrow.id, 'returning', { actor: req.user }));
   },
 
   // ===== ฝั่ง staff =====
@@ -75,7 +79,7 @@ const borrowController = {
     if (item.available <= 0) throw conflict('อุปกรณ์หมดแล้ว ถูกอนุมัติให้คนอื่นไปก่อน');
 
     // ไม่ต้องแก้ equipment — available คำนวณจาก borrows อยู่แล้ว
-    res.json(await borrowModel.setStatus(borrow.id, 'approved'));
+    res.json(await borrowModel.setStatus(borrow.id, 'approved', { actor: req.user }));
   },
 
   // PUT /api/borrows/:id/reject
@@ -84,7 +88,10 @@ const borrowController = {
     if (!borrow) throw notFound('ไม่พบรายการยืม');
     if (borrow.status !== 'pending') throw conflict('รายการนี้ไม่ได้รออนุมัติ');
 
-    res.json(await borrowModel.setStatus(borrow.id, 'rejected'));
+    // เหตุผลที่ปฏิเสธ ไม่บังคับ แต่เก็บไว้ให้ผู้ยืมเห็นว่าทำไมถึงไม่ผ่าน
+    const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() || null : null;
+
+    res.json(await borrowModel.setStatus(borrow.id, 'rejected', { actor: req.user, reason }));
   },
 
   // PUT /api/borrows/:id/confirm-return
@@ -96,7 +103,10 @@ const borrowController = {
       throw conflict('รายการนี้ไม่ได้อยู่ระหว่างการยืม');
     }
 
-    res.json(await borrowModel.markReturned(borrow.id));
+    // สภาพของตอนคืน เช่น "เลนส์มีรอย" — ไม่บังคับ
+    const note = typeof req.body.note === 'string' ? req.body.note.trim() || null : null;
+
+    res.json(await borrowModel.markReturned(borrow.id, { actor: req.user, note }));
   }
 };
 

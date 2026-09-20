@@ -66,6 +66,7 @@ BASE=http://localhost:6002/api node db/smoke-test.js
 | `GET /equipment` · `GET /equipment/:id` | ทุกคน |
 | `POST /equipment` · `PUT /equipment/:id` · `DELETE /equipment/:id` | staff, admin |
 | `POST /uploads` | staff, admin |
+| `GET /equipment/:id/logs` | staff, admin |
 | `POST /borrows` | ทุกคน |
 | `GET /borrows/mine` | ทุกคน |
 | `PUT /borrows/:id/request-return` | เจ้าของรายการ (staff/admin ทำแทนได้) |
@@ -155,6 +156,9 @@ cors -> json -> cookieParser -> /uploads (static) -> /api/health
   (FK เป็น `ON DELETE RESTRICT`)
 - แจ้งคืนได้เฉพาะรายการของตัวเอง ยกเว้น staff/admin ทำแทนได้
 - "เกินกำหนด" ไม่ใช่สถานะในฐานข้อมูล แต่คำนวณจาก `approved` + `dueDate < วันนี้`
+- ทุกการเปลี่ยนสถานะบันทึกลง `equipment_logs` พร้อมว่าใครเป็นคนทำ
+  และเก็บ `approved_by` / `received_by` / `reject_reason` / `return_note` ไว้ในแถวการยืมด้วย
+  (ตอนปฏิเสธและรับคืนส่งเหตุผล/หมายเหตุมาใน body ได้ ไม่บังคับ)
 
 ---
 

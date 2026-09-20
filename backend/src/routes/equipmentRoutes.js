@@ -10,6 +10,9 @@ const router = express.Router();
 router.get('/', wrap(ctrl.list));
 router.get('/:id', wrap(ctrl.getOne));
 
+// ประวัติ — staff + admin เท่านั้น
+router.get('/:id/logs', requireRole('staff', 'admin'), wrap(ctrl.logs));
+
 // เขียนได้เฉพาะ staff + admin
 router.post('/', requireRole('staff', 'admin'), wrap(ctrl.create));
 router.put('/:id', requireRole('staff', 'admin'), wrap(ctrl.update));

@@ -67,7 +67,8 @@ _entrypoint/init.sh   สร้าง app user + schema drizzle ตอน contai
 | `user_identities` | บัญชี OAuth ที่ผูกไว้ — คนเดียวผูกได้หลายผู้ให้บริการ |
 | `sessions` | session ที่ยังไม่หมดอายุ (คุกกี้เก็บแค่ token) |
 | `equipment` | อุปกรณ์และจำนวนทั้งหมดที่มี |
-| `borrows` | รายการยืม หนึ่งแถว = อุปกรณ์หนึ่งชิ้น |
+| `borrows` | รายการยืม หนึ่งแถว = อุปกรณ์หนึ่งชิ้น + บันทึกว่าใครอนุมัติ/รับคืน |
+| `equipment_logs` | ประวัติการเปลี่ยนแปลงทั้งหมด ใครทำอะไรเมื่อไหร่ |
 
 ### ทำไมถึงเป็นแบบ "จำนวนรวม" ไม่ใช่ "รายชิ้น"
 
@@ -96,6 +97,10 @@ _entrypoint/init.sh   สร้าง app user + schema drizzle ตอน contai
 - อีเมลใน `users` unique แบบไม่สนตัวพิมพ์ (`lower(email)`)
 - มี CHECK บังคับว่า `returned_at` มีค่าได้เฉพาะตอน status เป็น `returned`
   และ `quantity` ห้ามติดลบ
+- **`equipment_logs` เก็บชื่ออุปกรณ์กับชื่อผู้ทำซ้ำไว้ในแถว** และ FK เป็น `SET NULL`
+  ไม่ใช่ `CASCADE` — ประวัติต้องอ่านรู้เรื่องแม้ของถูกลบไปแล้ว
+  ถ้าใช้ CASCADE พอลบอุปกรณ์ทิ้งประวัติจะหายตามไปด้วย ซึ่งผิดวัตถุประสงค์
+- การเปลี่ยนสถานะการยืมกับการเขียน log อยู่ในทรานแซกชันเดียวกันเสมอ
 
 ---
 
@@ -119,6 +124,7 @@ const items = await equipmentModel.listAll();   // ทุกฟังก์ช�
 | `userModel` | `listAll` `findById` `setRole` |
 | `equipmentModel` | `listAll` `findById` `borrowedCount` `create` `update` `remove` |
 | `borrowModel` | `listAll` `listByBorrower` `findById` `create` `setStatus` `markReturned` |
+| `logModel` | `write` `listByEquipment` `listAll` |
 | `authModel` | `findOrCreateFromOAuth` `createSession` `findUserBySession` `deleteSession` `deleteExpiredSessions` |
 
 สิ่งที่ชั้นนี้รับประกันให้:

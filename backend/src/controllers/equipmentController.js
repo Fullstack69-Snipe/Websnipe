@@ -2,6 +2,7 @@
 // ตรงกับ mockApi: listEquipment / createEquipment / updateEquipment / deleteEquipment
 
 const equipmentModel = require('../models/equipmentModel');
+const { logModel } = require('db');
 const { badRequest, notFound, conflict } = require('../utils/HttpError');
 
 // ตรวจ EquipmentInput = { name, description, imageUrl, quantity }
@@ -42,7 +43,7 @@ const equipmentController = {
   // POST /api/equipment
   async create(req, res) {
     const input = parseInput(req.body);
-    res.status(201).json(await equipmentModel.create(input));
+    res.status(201).json(await equipmentModel.create(input, req.user));
   },
 
   // PUT /api/equipment/:id
@@ -58,7 +59,15 @@ const equipmentController = {
       throw conflict(`ลดจำนวนไม่ได้ ตอนนี้ถูกยืมอยู่ ${holding} ชิ้น`);
     }
 
-    res.json(await equipmentModel.update(id, input));
+    res.json(await equipmentModel.update(id, input, req.user));
+  },
+
+  // GET /api/equipment/:id/logs — ประวัติของอุปกรณ์ชิ้นนี้
+  async logs(req, res) {
+    const { id } = req.params;
+    if (!await equipmentModel.findById(id)) throw notFound('ไม่พบอุปกรณ์');
+
+    res.json(await logModel.listByEquipment(id));
   },
 
   // DELETE /api/equipment/:id
@@ -70,7 +79,7 @@ const equipmentController = {
       throw conflict('อุปกรณ์กำลังถูกยืมอยู่ ลบไม่ได้');
     }
 
-    await equipmentModel.remove(id);
+    await equipmentModel.remove(id, req.user);
     res.status(204).end();
   }
 };

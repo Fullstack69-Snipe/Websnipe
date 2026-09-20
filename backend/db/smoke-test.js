@@ -71,7 +71,7 @@ const STAFF = { as: 'staff' };
     const { body: mine } = await call('GET', '/borrows/mine');
     const keys = Object.keys(mine[0]).sort().join(',');
     check('field ครบและชื่อตรง',
-      keys === 'borrowerId,borrowerName,createdAt,dueDate,equipmentId,equipmentName,id,returnedAt,status',
+      keys === 'approvedAt,approvedBy,approverName,borrowerId,borrowerName,createdAt,dueDate,equipmentId,equipmentName,id,purpose,receivedBy,rejectReason,returnNote,returnedAt,status',
       `got: ${keys}`);
     check('u1 เห็นแต่รายการตัวเอง', mine.every((b) => b.borrowerId === 'u1'));
     check('เรียงใหม่สุดขึ้นก่อน', mine[0].createdAt >= mine[mine.length - 1].createdAt);

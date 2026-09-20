@@ -11,6 +11,7 @@ export { connectionString } from "@db/utils.js";
 export {
   borrowsTable,
   equipmentTable,
+  equipmentLogsTable,
   sessionsTable,
   userIdentitiesTable,
   usersTable,
@@ -29,9 +30,16 @@ export {
   type User,
   type UserIdentity,
   type AuthProvider,
+  type EquipmentLog,
+  type LogAction,
 } from "@db/schema.js";
 
-export { borrowModel, type BorrowRow } from "@db/models/borrowModel.js";
+export {
+  borrowModel,
+  type Actor,
+  type BorrowRow,
+} from "@db/models/borrowModel.js";
+export { logModel, type LogRow, type LogInput } from "@db/models/logModel.js";
 export {
   equipmentModel,
   HOLDING,

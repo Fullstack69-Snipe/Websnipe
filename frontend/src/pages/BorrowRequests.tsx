@@ -120,7 +120,19 @@ export default function BorrowRequests() {
                 return (
                   <tr key={b.id}>
                     <td>{b.borrowerName}</td>
-                    <td>{b.equipmentName}</td>
+                    <td>
+                      {b.equipmentName}
+                      {b.purpose && <small className="muted-line">เพื่อ: {b.purpose}</small>}
+                      {b.approverName && b.status !== 'rejected' && (
+                        <small className="muted-line">อนุมัติโดย: {b.approverName}</small>
+                      )}
+                      {b.rejectReason && (
+                        <small className="muted-line">เหตุผลที่ปฏิเสธ: {b.rejectReason}</small>
+                      )}
+                      {b.returnNote && (
+                        <small className="muted-line">สภาพตอนคืน: {b.returnNote}</small>
+                      )}
+                    </td>
                     <td>{dayjs(b.createdAt).format('D MMM YYYY')}</td>
                     <td className={overdue ? 'overdue' : undefined}>
                       {dayjs(b.dueDate).format('D MMM YYYY')}
@@ -142,9 +154,15 @@ export default function BorrowRequests() {
                               type="button"
                               className="outline secondary"
                               disabled={busy}
-                              onClick={() =>
-                                act(b.id, api.rejectBorrow, `ปฏิเสธคำขอของ ${b.borrowerName}?`)
-                              }
+                              onClick={() => {
+                                // เหตุผลไม่บังคับ กด OK ทั้งที่ว่างก็ปฏิเสธได้
+                                const reason = prompt(
+                                  `ปฏิเสธคำขอของ ${b.borrowerName}
+เหตุผล (ไม่บังคับ):`,
+                                )
+                                if (reason === null) return
+                                act(b.id, (id) => api.rejectBorrow(id, reason.trim() || undefined))
+                              }}
                             >
                               ปฏิเสธ
                             </button>
@@ -155,9 +173,14 @@ export default function BorrowRequests() {
                             type="button"
                             className="outline"
                             aria-busy={busy}
-                            onClick={() =>
-                              act(b.id, api.confirmReturn, `ยืนยันรับคืน "${b.equipmentName}"?`)
-                            }
+                            onClick={() => {
+                              const note = prompt(
+                                `ยืนยันรับคืน "${b.equipmentName}"
+สภาพของตอนคืน (ไม่บังคับ):`,
+                              )
+                              if (note === null) return
+                              act(b.id, (id) => api.confirmReturn(id, note.trim() || undefined))
+                            }}
                           >
                             รับคืน
                           </button>

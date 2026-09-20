@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import type { Equipment, EquipmentInput, Borrow, BorrowStatus, User, Role } from '../types'
+import type { Equipment, EquipmentInput, Borrow, BorrowStatus, EquipmentLog, User, Role } from '../types'
 
 const delay = (ms = 400) => new Promise((r) => setTimeout(r, ms))
 
@@ -32,18 +32,24 @@ let borrows: Borrow[] = [
     id: 'b1', equipmentId: 'e2', equipmentName: 'โน้ตบุ๊ก Dell Latitude 5450',
     borrowerId: 'u4', borrowerName: 'วิชัย มั่นคง',
     dueDate: dayjs().add(5, 'day').format('YYYY-MM-DD'),
+    purpose: null, approvedBy: null, approverName: null, approvedAt: null,
+    rejectReason: null, receivedBy: null, returnNote: null,
     status: 'approved', createdAt: dayjs().subtract(2, 'day').toISOString(), returnedAt: null,
   },
   {
     id: 'b2', equipmentId: 'e5', equipmentName: 'โปรเจกเตอร์ Epson EB-X06',
     borrowerId: 'u1', borrowerName: 'สมชาย ใจดี',
     dueDate: dayjs().subtract(1, 'day').format('YYYY-MM-DD'),   // เกินกำหนดแล้ว!
+    purpose: null, approvedBy: null, approverName: null, approvedAt: null,
+    rejectReason: null, receivedBy: null, returnNote: null,
     status: 'approved', createdAt: dayjs().subtract(9, 'day').toISOString(), returnedAt: null,
   },
   {
     id: 'b3', equipmentId: 'e1', equipmentName: 'กล้อง Canon EOS R50',
     borrowerId: 'u1', borrowerName: 'สมชาย ใจดี',
     dueDate: dayjs().subtract(20, 'day').format('YYYY-MM-DD'),
+    purpose: null, approvedBy: null, approverName: null, approvedAt: null,
+    rejectReason: null, receivedBy: null, returnNote: null,
     status: 'returned', createdAt: dayjs().subtract(30, 'day').toISOString(),
     returnedAt: dayjs().subtract(21, 'day').toISOString(),
   },
@@ -119,7 +125,7 @@ export const mockApi = {
   },
 
   // ===== การยืม — ฝั่งผู้ยืม =====
-  async requestBorrow(equipmentId: string, dueDate: string): Promise<Borrow> {
+  async requestBorrow(equipmentId: string, dueDate: string, purpose?: string): Promise<Borrow> {
     await delay()
     const item = findEquipment(equipmentId)
     if (item.available <= 0) throw new Error('อุปกรณ์ชิ้นนี้ถูกยืมหมดแล้ว')
@@ -132,6 +138,13 @@ export const mockApi = {
       borrowerId: me.id,
       borrowerName: me.fullName,
       dueDate,
+      purpose: purpose ?? null,
+      approvedBy: null,
+      approverName: null,
+      approvedAt: null,
+      rejectReason: null,
+      receivedBy: null,
+      returnNote: null,
       status: 'pending',
       createdAt: new Date().toISOString(),
       returnedAt: null,
@@ -171,27 +184,33 @@ export const mockApi = {
     return patchBorrow(borrowId, { status: 'approved' })
   },
 
-  async rejectBorrow(borrowId: string): Promise<Borrow> {
+  async rejectBorrow(borrowId: string, reason?: string): Promise<Borrow> {
     await delay()
     const b = findBorrow(borrowId)
     if (b.status !== 'pending') throw new Error('รายการนี้ไม่ได้รออนุมัติ')
-    return patchBorrow(borrowId, { status: 'rejected' })
+    return patchBorrow(borrowId, { status: 'rejected', rejectReason: reason ?? null })
   },
 
-  async confirmReturn(borrowId: string): Promise<Borrow> {
+  async confirmReturn(borrowId: string, note?: string): Promise<Borrow> {
     await delay()
     const b = findBorrow(borrowId)
     if (b.status !== 'approved' && b.status !== 'returning') {
       throw new Error('รายการนี้ไม่ได้อยู่ระหว่างการยืม')
     }
     // ไม่ต้องแก้ equipment — available จะเพิ่มขึ้นเองเพราะคำนวณจาก borrows
-    return patchBorrow(borrowId, { status: 'returned', returnedAt: new Date().toISOString() })
+    return patchBorrow(borrowId, { status: 'returned', returnedAt: new Date().toISOString(), returnNote: note ?? null })
   },
 
   // ===== ผู้ใช้ — ฝั่ง admin =====
   async listUsers(): Promise<User[]> {
     await delay()
     return users
+  },
+
+  // โหมด mock ไม่ได้เก็บประวัติ คืนว่างไว้ให้หน้าจอไม่พัง
+  async equipmentLogs(): Promise<EquipmentLog[]> {
+    await delay(0)
+    return []
   },
 
   // ===== auth (โหมด mock: ถือว่า login เป็น CURRENT_USER_ID อยู่แล้วเสมอ) =====

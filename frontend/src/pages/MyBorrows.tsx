@@ -90,7 +90,15 @@ function BorrowTable({ rows, onReturn }: TableProps) {
             const overdue = b.status === 'approved' && dayjs().isAfter(dayjs(b.dueDate), 'day')
             return (
               <tr key={b.id}>
-                <td>{b.equipmentName}</td>
+                <td>
+                  {b.equipmentName}
+                  {b.rejectReason && (
+                    <small className="muted-line">เหตุผลที่ปฏิเสธ: {b.rejectReason}</small>
+                  )}
+                  {b.returnNote && (
+                    <small className="muted-line">สภาพตอนคืน: {b.returnNote}</small>
+                  )}
+                </td>
                 <td>{dayjs(b.createdAt).format('D MMM YYYY')}</td>
                 <td className={overdue ? 'overdue' : undefined}>
                   {dayjs(b.dueDate).format('D MMM YYYY')}

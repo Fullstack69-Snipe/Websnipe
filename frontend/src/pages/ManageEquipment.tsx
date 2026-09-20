@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import type { Equipment, EquipmentInput } from '../types'
 import EquipmentForm from '../components/EquipmentForm'
+import EquipmentHistory from '../components/EquipmentHistory'
 
 // null = ปิดฟอร์ม / 'new' = เพิ่มใหม่ / Equipment = แก้ไขชิ้นนั้น
 type Editing = null | 'new' | Equipment
@@ -11,6 +12,8 @@ export default function ManageEquipment() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<Editing>(null)
+  // อุปกรณ์ที่กำลังเปิดดูประวัติอยู่
+  const [historyOf, setHistoryOf] = useState<Equipment | null>(null)
 
   async function load() {
     try {
@@ -109,6 +112,13 @@ export default function ManageEquipment() {
                         </button>
                         <button
                           type="button"
+                          className="outline"
+                          onClick={() => setHistoryOf(item)}
+                        >
+                          ประวัติ
+                        </button>
+                        <button
+                          type="button"
                           className="outline secondary"
                           onClick={() => handleDelete(item)}
                           disabled={borrowed > 0}
@@ -124,6 +134,10 @@ export default function ManageEquipment() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {historyOf && (
+        <EquipmentHistory item={historyOf} onClose={() => setHistoryOf(null)} />
       )}
 
       {editing && (
