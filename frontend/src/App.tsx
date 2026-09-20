@@ -8,6 +8,7 @@ import EquipmentList from './pages/EquipmentList'
 import MyBorrows from './pages/MyBorrows'
 import ManageEquipment from './pages/ManageEquipment'
 import BorrowRequests from './pages/BorrowRequests'
+import ManageCategories from './pages/ManageCategories'
 import ManageUsers from './pages/ManageUsers'
 import type { Role } from './types'
 
@@ -64,6 +65,14 @@ export default function App() {
               element={
                 <Guard allow={STAFF}>
                   <BorrowRequests />
+                </Guard>
+              }
+            />
+            <Route
+              path="/manage/categories"
+              element={
+                <Guard allow={STAFF}>
+                  <ManageCategories />
                 </Guard>
               }
             />

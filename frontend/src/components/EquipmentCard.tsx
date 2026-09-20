@@ -22,6 +22,8 @@ export default function EquipmentCard({ item, onBorrow }: Props) {
         <StatusBadge status={isAvailable ? 'available' : 'borrowed'} />
       </header>
 
+      {item.categoryName && <p className="chip">{item.categoryName}</p>}
+
       <p>{item.description}</p>
 
       <footer>

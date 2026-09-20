@@ -66,7 +66,8 @@ _entrypoint/init.sh   สร้าง app user + schema drizzle ตอน contai
 | `users` | ผู้ใช้ + role (`user` / `staff` / `admin`) |
 | `user_identities` | บัญชี OAuth ที่ผูกไว้ — คนเดียวผูกได้หลายผู้ให้บริการ |
 | `sessions` | session ที่ยังไม่หมดอายุ (คุกกี้เก็บแค่ token) |
-| `equipment` | อุปกรณ์และจำนวนทั้งหมดที่มี |
+| `categories` | หมวดหมู่อุปกรณ์ |
+| `equipment` | อุปกรณ์และจำนวนทั้งหมดที่มี + หมวดหมู่ |
 | `borrows` | รายการยืม หนึ่งแถว = อุปกรณ์หนึ่งชิ้น + บันทึกว่าใครอนุมัติ/รับคืน |
 | `equipment_logs` | ประวัติการเปลี่ยนแปลงทั้งหมด ใครทำอะไรเมื่อไหร่ |
 
@@ -101,6 +102,9 @@ _entrypoint/init.sh   สร้าง app user + schema drizzle ตอน contai
   ไม่ใช่ `CASCADE` — ประวัติต้องอ่านรู้เรื่องแม้ของถูกลบไปแล้ว
   ถ้าใช้ CASCADE พอลบอุปกรณ์ทิ้งประวัติจะหายตามไปด้วย ซึ่งผิดวัตถุประสงค์
 - การเปลี่ยนสถานะการยืมกับการเขียน log อยู่ในทรานแซกชันเดียวกันเสมอ
+- `equipment.category_id` เป็น `SET NULL` — ลบหมวดหมู่แล้วอุปกรณ์ยังอยู่
+  แค่กลายเป็น "ไม่ระบุหมวดหมู่" ไม่ต้องย้ายของออกก่อนลบ
+- ชื่อหมวดหมู่ unique แบบ `lower(trim(name))` กัน "กล้อง" กับ " กล้อง " ซ้ำกัน
 
 ---
 
@@ -125,6 +129,7 @@ const items = await equipmentModel.listAll();   // ทุกฟังก์ช�
 | `equipmentModel` | `listAll` `findById` `borrowedCount` `create` `update` `remove` |
 | `borrowModel` | `listAll` `listByBorrower` `findById` `create` `setStatus` `markReturned` |
 | `logModel` | `write` `listByEquipment` `listAll` |
+| `categoryModel` | `listAll` `findById` `create` `update` `remove` |
 | `authModel` | `findOrCreateFromOAuth` `createSession` `findUserBySession` `deleteSession` `deleteExpiredSessions` |
 
 สิ่งที่ชั้นนี้รับประกันให้:

@@ -10,6 +10,18 @@ export type User = {
   avatarUrl?: string | null
 }
 
+export type Category = {
+  id: number
+  name: string
+  description: string | null
+  equipmentCount: number
+}
+
+export type CategoryInput = {
+  name: string
+  description?: string | null
+}
+
 export type Equipment = {
   id: string
   name: string
@@ -17,10 +29,12 @@ export type Equipment = {
   imageUrl: string | null
   quantity: number     // จำนวนทั้งหมดที่มี
   available: number    // จำนวนที่เหลือให้ยืม (ระบบคำนวณให้ ไม่ได้เก็บใน DB)
+  categoryId: number | null
+  categoryName: string | null   // ระบบ join มาให้ ไม่ต้องส่งตอนบันทึก
 }
 
 // ข้อมูลที่ staff กรอกตอนเพิ่ม/แก้ไข (ไม่มี id เพราะระบบสร้าง / ไม่มี available เพราะระบบคำนวณ)
-export type EquipmentInput = Omit<Equipment, 'id' | 'available'>
+export type EquipmentInput = Omit<Equipment, 'id' | 'available' | 'categoryName'>
 
 export type Borrow = {
   id: string

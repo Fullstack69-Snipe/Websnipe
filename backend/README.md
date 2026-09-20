@@ -67,6 +67,8 @@ BASE=http://localhost:6002/api node db/smoke-test.js
 | `POST /equipment` · `PUT /equipment/:id` · `DELETE /equipment/:id` | staff, admin |
 | `POST /uploads` | staff, admin |
 | `GET /equipment/:id/logs` | staff, admin |
+| `GET /categories` | ทุกคน |
+| `POST /categories` · `PUT /categories/:id` · `DELETE /categories/:id` | staff, admin |
 | `POST /borrows` | ทุกคน |
 | `GET /borrows/mine` | ทุกคน |
 | `PUT /borrows/:id/request-return` | เจ้าของรายการ (staff/admin ทำแทนได้) |

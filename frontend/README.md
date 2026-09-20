@@ -63,7 +63,8 @@ src/
 │   ├── SignIn.tsx        ปุ่มเข้าสู่ระบบ (ขึ้นเฉพาะช่องทางที่ backend เปิดไว้)
 │   ├── EquipmentList.tsx รายการอุปกรณ์ + ค้นหา + ขอยืม
 │   ├── MyBorrows.tsx     การยืมของฉัน + แจ้งคืน
-│   ├── ManageEquipment.tsx  เพิ่ม/แก้/ลบอุปกรณ์            (staff, admin)
+│   ├── ManageEquipment.tsx  เพิ่ม/แก้/ลบอุปกรณ์ + ดูประวัติ (staff, admin)
+│   ├── ManageCategories.tsx จัดการหมวดหมู่                 (staff, admin)
 │   ├── BorrowRequests.tsx   อนุมัติ/ปฏิเสธ/รับคืน          (staff, admin)
 │   └── ManageUsers.tsx      ตั้งสิทธิ์ผู้ใช้                (admin)
 │
@@ -105,7 +106,7 @@ redirect ออกไปหน้าเว็บของผู้ให้บ�
 | --- | --- |
 | `/signin` | ไม่ต้อง login |
 | `/equipment`, `/my-borrows` | login แล้ว |
-| `/manage/equipment`, `/manage/requests` | staff, admin |
+| `/manage/equipment`, `/manage/requests`, `/manage/categories` | staff, admin |
 | `/admin/users` | admin |
 
 ---

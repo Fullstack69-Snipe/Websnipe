@@ -1,5 +1,8 @@
 import dayjs from 'dayjs'
-import type { Equipment, EquipmentInput, Borrow, BorrowStatus, EquipmentLog, User, Role } from '../types'
+import type {
+  Equipment, EquipmentInput, Borrow, BorrowStatus, EquipmentLog,
+  Category, CategoryInput, User, Role,
+} from '../types'
 
 const delay = (ms = 400) => new Promise((r) => setTimeout(r, ms))
 
@@ -17,13 +20,20 @@ let users: User[] = [
 // ในฐานข้อมูลจริงจะเก็บแบบนี้ — ไม่มี available (คำนวณจากรายการยืมทุกครั้ง)
 type EquipmentRow = Omit<Equipment, 'available'>
 
+let categories: Category[] = [
+  { id: 1, name: 'กล้องและถ่ายภาพ', description: 'กล้อง เลนส์ ขาตั้ง', equipmentCount: 2 },
+  { id: 2, name: 'คอมพิวเตอร์', description: 'โน้ตบุ๊ก แท็บเล็ต', equipmentCount: 1 },
+  { id: 3, name: 'เสียงและแสง', description: 'ไมค์ ไฟ ลำโพง', equipmentCount: 2 },
+  { id: 4, name: 'จอและการนำเสนอ', description: 'โปรเจกเตอร์ จอ', equipmentCount: 1 },
+]
+
 let equipment: EquipmentRow[] = [
-  { id: 'e1', name: 'กล้อง Canon EOS R50', description: 'พร้อมเลนส์คิท 18-45mm', imageUrl: 'https://picsum.photos/seed/camera/400/240', quantity: 2 },
-  { id: 'e2', name: 'โน้ตบุ๊ก Dell Latitude 5450', description: 'i5 / RAM 16GB / SSD 512GB', imageUrl: 'https://picsum.photos/seed/laptop/400/240', quantity: 3 },
-  { id: 'e3', name: 'ขาตั้งกล้อง Manfrotto', description: 'สูงสุด 160 cm พร้อมกระเป๋า', imageUrl: 'https://picsum.photos/seed/tripod/400/240', quantity: 4 },
-  { id: 'e4', name: 'ไมค์ Rode Wireless GO II', description: 'ไมค์ไร้สาย 2 ตัว', imageUrl: null, quantity: 1 },
-  { id: 'e5', name: 'โปรเจกเตอร์ Epson EB-X06', description: '3600 lumens พร้อมสาย HDMI', imageUrl: 'https://picsum.photos/seed/projector/400/240', quantity: 1 },
-  { id: 'e6', name: 'ไฟ LED Godox SL60', description: 'พร้อมซอฟต์บ็อกซ์', imageUrl: 'https://picsum.photos/seed/light/400/240', quantity: 6 },
+  { id: 'e1', categoryId: 1, categoryName: null, name: 'กล้อง Canon EOS R50', description: 'พร้อมเลนส์คิท 18-45mm', imageUrl: 'https://picsum.photos/seed/camera/400/240', quantity: 2 },
+  { id: 'e2', categoryId: 2, categoryName: null, name: 'โน้ตบุ๊ก Dell Latitude 5450', description: 'i5 / RAM 16GB / SSD 512GB', imageUrl: 'https://picsum.photos/seed/laptop/400/240', quantity: 3 },
+  { id: 'e3', categoryId: 1, categoryName: null, name: 'ขาตั้งกล้อง Manfrotto', description: 'สูงสุด 160 cm พร้อมกระเป๋า', imageUrl: 'https://picsum.photos/seed/tripod/400/240', quantity: 4 },
+  { id: 'e4', categoryId: 3, categoryName: null, name: 'ไมค์ Rode Wireless GO II', description: 'ไมค์ไร้สาย 2 ตัว', imageUrl: null, quantity: 1 },
+  { id: 'e5', categoryId: 4, categoryName: null, name: 'โปรเจกเตอร์ Epson EB-X06', description: '3600 lumens พร้อมสาย HDMI', imageUrl: 'https://picsum.photos/seed/projector/400/240', quantity: 1 },
+  { id: 'e6', categoryId: 3, categoryName: null, name: 'ไฟ LED Godox SL60', description: 'พร้อมซอฟต์บ็อกซ์', imageUrl: 'https://picsum.photos/seed/light/400/240', quantity: 6 },
 ]
 
 // seed ให้มีรายการยืมอยู่แล้ว จะได้เห็นหน้าต่าง ๆ ไม่ว่างเปล่า
@@ -101,7 +111,7 @@ export const mockApi = {
 
   async createEquipment(input: EquipmentInput): Promise<Equipment> {
     await delay()
-    const row: EquipmentRow = { ...input, id: crypto.randomUUID() }
+    const row: EquipmentRow = { ...input, id: crypto.randomUUID(), categoryName: null }
     equipment = [...equipment, row]
     return withAvailable(row)
   },
@@ -122,6 +132,40 @@ export const mockApi = {
     findEquipment(id)
     if (borrowedCount(id) > 0) throw new Error('อุปกรณ์กำลังถูกยืมอยู่ ลบไม่ได้')
     equipment = equipment.filter((e) => e.id !== id)
+  },
+
+  // ===== หมวดหมู่ =====
+  async listCategories(): Promise<Category[]> {
+    await delay(0)
+    return categories
+  },
+
+  async createCategory(input: CategoryInput): Promise<Category> {
+    await delay()
+    const row: Category = {
+      id: Math.max(0, ...categories.map((c) => c.id)) + 1,
+      name: input.name,
+      description: input.description ?? null,
+      equipmentCount: 0,
+    }
+    categories = [...categories, row]
+    return row
+  },
+
+  async updateCategory(id: number, input: CategoryInput): Promise<Category> {
+    await delay()
+    categories = categories.map((c) =>
+      c.id === id ? { ...c, name: input.name, description: input.description ?? null } : c,
+    )
+    return categories.find((c) => c.id === id)!
+  },
+
+  async deleteCategory(id: number): Promise<{ ok: true; unassigned: number }> {
+    await delay()
+    const unassigned = equipment.filter((e) => e.categoryId === id).length
+    equipment = equipment.map((e) => (e.categoryId === id ? { ...e, categoryId: null } : e))
+    categories = categories.filter((c) => c.id !== id)
+    return { ok: true, unassigned }
   },
 
   // ===== การยืม — ฝั่งผู้ยืม =====

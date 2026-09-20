@@ -10,6 +10,7 @@ export { connectionString } from "@db/utils.js";
 
 export {
   borrowsTable,
+  categoriesTable,
   equipmentTable,
   equipmentLogsTable,
   sessionsTable,
@@ -30,6 +31,7 @@ export {
   type User,
   type UserIdentity,
   type AuthProvider,
+  type Category,
   type EquipmentLog,
   type LogAction,
 } from "@db/schema.js";
@@ -40,6 +42,11 @@ export {
   type BorrowRow,
 } from "@db/models/borrowModel.js";
 export { logModel, type LogRow, type LogInput } from "@db/models/logModel.js";
+export {
+  categoryModel,
+  type CategoryRow,
+  type CategoryInput,
+} from "@db/models/categoryModel.js";
 export {
   equipmentModel,
   HOLDING,

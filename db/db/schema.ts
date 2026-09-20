@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  bigint,
   bigserial,
   check,
   date,
@@ -78,6 +79,24 @@ export const usersTable = pgTable(
   ],
 );
 
+// ---------- categories ----------
+// หมวดหมู่อุปกรณ์ เช่น กล้อง, คอมพิวเตอร์, เสียง
+export const categoriesTable = pgTable(
+  "categories",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    name: varchar("name", { length: 100 }).notNull(),
+    description: text("description"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    // กันชื่อซ้ำแบบไม่สนตัวพิมพ์/ช่องว่างหัวท้าย
+    uniqueIndex("categories_name_unique").on(sql`lower(trim(${table.name}))`),
+  ],
+);
+
 // ---------- equipment ----------
 // ไม่มีคอลัมน์ available — คำนวณสดจาก borrows ทุกครั้ง (quantity - จำนวนที่ถือของอยู่)
 // เพื่อไม่ให้ข้อมูลไม่ตรงกัน (drift) จากการเก็บตัวเลขซ้ำสองที่
@@ -89,6 +108,11 @@ export const equipmentTable = pgTable(
     description: text("description").notNull().default(""),
     imageUrl: text("image_url"),
     quantity: integer("quantity").notNull().default(0),
+    // ลบหมวดหมู่แล้วอุปกรณ์ต้องไม่หายตาม แค่กลับไปเป็น "ไม่ระบุหมวดหมู่"
+    categoryId: bigint("category_id", { mode: "number" }).references(
+      () => categoriesTable.id,
+      { onDelete: "set null" },
+    ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -100,6 +124,7 @@ export const equipmentTable = pgTable(
   (table) => [
     check("equipment_quantity_non_negative", sql`${table.quantity} >= 0`),
     index("idx_equipment_created_at").on(table.createdAt),
+    index("idx_equipment_category").on(table.categoryId),
   ],
 );
 
@@ -281,7 +306,15 @@ export const sessionsRelations = relations(sessionsTable, ({ one }) => ({
   }),
 }));
 
-export const equipmentRelations = relations(equipmentTable, ({ many }) => ({
+export const categoriesRelations = relations(categoriesTable, ({ many }) => ({
+  equipment: many(equipmentTable),
+}));
+
+export const equipmentRelations = relations(equipmentTable, ({ many, one }) => ({
+  category: one(categoriesTable, {
+    fields: [equipmentTable.categoryId],
+    references: [categoriesTable.id],
+  }),
   borrows: many(borrowsTable),
   logs: many(equipmentLogsTable),
 }));
@@ -326,5 +359,7 @@ export type UserIdentity = typeof userIdentitiesTable.$inferSelect;
 export type NewUserIdentity = typeof userIdentitiesTable.$inferInsert;
 export type Session = typeof sessionsTable.$inferSelect;
 export type NewSession = typeof sessionsTable.$inferInsert;
+export type Category = typeof categoriesTable.$inferSelect;
+export type NewCategory = typeof categoriesTable.$inferInsert;
 export type EquipmentLog = typeof equipmentLogsTable.$inferSelect;
 export type NewEquipmentLog = typeof equipmentLogsTable.$inferInsert;

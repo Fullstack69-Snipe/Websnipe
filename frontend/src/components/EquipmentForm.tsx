@@ -1,17 +1,19 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
-import type { Equipment, EquipmentInput } from '../types'
+import type { Category, Equipment, EquipmentInput } from '../types'
 
 type Props = {
   initial: Equipment | null // null = เพิ่มใหม่
+  categories: Category[]
   onSubmit: (input: EquipmentInput) => Promise<void>
   onClose: () => void
 }
 
-export default function EquipmentForm({ initial, onSubmit, onClose }: Props) {
+export default function EquipmentForm({ initial, categories, onSubmit, onClose }: Props) {
   const [name, setName] = useState(initial?.name ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [quantity, setQuantity] = useState(initial?.quantity ?? 1)
   const [imageUrl, setImageUrl] = useState<string | null>(initial?.imageUrl ?? null)
+  const [categoryId, setCategoryId] = useState<number | null>(initial?.categoryId ?? null)
   const [saving, setSaving] = useState(false)
 
   // อ่านไฟล์รูปเป็น data URL — ตอนต่อ backend จริงค่อยเปลี่ยนเป็นอัปโหลดขึ้น Storage
@@ -30,7 +32,13 @@ export default function EquipmentForm({ initial, onSubmit, onClose }: Props) {
 
     setSaving(true)
     try {
-      await onSubmit({ name: name.trim(), description: description.trim(), quantity, imageUrl })
+      await onSubmit({
+        name: name.trim(),
+        description: description.trim(),
+        quantity,
+        imageUrl,
+        categoryId,
+      })
     } finally {
       setSaving(false)
     }
@@ -53,6 +61,35 @@ export default function EquipmentForm({ initial, onSubmit, onClose }: Props) {
             รายละเอียด
             <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
           </label>
+
+          <label>
+
+            หมวดหมู่ (ไม่บังคับ)
+
+            <select
+
+              value={categoryId ?? ''}
+
+              onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : null)}
+
+            >
+
+              <option value="">— ไม่ระบุ —</option>
+
+              {categories.map((c) => (
+
+                <option key={c.id} value={c.id}>
+
+                  {c.name}
+
+                </option>
+
+              ))}
+
+            </select>
+
+          </label>
+
 
           <label>
             จำนวนทั้งหมด

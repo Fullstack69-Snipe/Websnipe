@@ -1,4 +1,7 @@
-import type { Equipment, EquipmentInput, Borrow, EquipmentLog, User, Role } from '../types'
+import type {
+  Equipment, EquipmentInput, Borrow, EquipmentLog,
+  Category, CategoryInput, User, Role,
+} from '../types'
 
 // ===================================================================
 // เรียก backend จริง — ชื่อฟังก์ชันและ signature เหมือน mockApi.ts ทุกตัว
@@ -54,6 +57,18 @@ export const realApi = {
     send<Equipment>('PUT', `/equipment/${id}`, input),
 
   deleteEquipment: (id: string) => send<void>('DELETE', `/equipment/${id}`),
+
+  // ===== หมวดหมู่ =====
+  listCategories: () => get<Category[]>('/categories'),
+
+  createCategory: (input: CategoryInput) => send<Category>('POST', '/categories', input),
+
+  updateCategory: (id: number, input: CategoryInput) =>
+    send<Category>('PUT', `/categories/${id}`, input),
+
+  // ลบได้เสมอ — อุปกรณ์ในหมวดนี้จะกลายเป็น "ไม่ระบุหมวดหมู่"
+  deleteCategory: (id: number) =>
+    send<{ ok: true; unassigned: number }>('DELETE', `/categories/${id}`),
 
   // ===== การยืม — ฝั่งผู้ยืม =====
   requestBorrow: (equipmentId: string, dueDate: string, purpose?: string) =>

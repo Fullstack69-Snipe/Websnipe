@@ -12,6 +12,7 @@ const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const { UPLOAD_DIR } = require('./middleware/upload');
 
 const equipmentRoutes = require('./routes/equipmentRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
 const borrowRoutes = require('./routes/borrowRoutes');
 const userRoutes = require('./routes/userRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
@@ -60,6 +61,7 @@ app.use('/api', wrap(attachIdentity));
 
 app.get('/api/me', wrap(userController.me));
 app.use('/api/equipment', equipmentRoutes);
+app.use('/api/categories', categoryRoutes);
 app.use('/api/borrows', borrowRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/uploads', uploadRoutes);

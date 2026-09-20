@@ -6,6 +6,7 @@
 import { dbClient, dbConn } from "@db/client.js";
 import {
   borrowsTable,
+  categoriesTable,
   equipmentTable,
   usersTable,
   type NewBorrow,
@@ -28,13 +29,21 @@ const users: NewUser[] = [
   { id: "u4", email: "wichai@example.com", fullName: "วิชัย มั่นคง", role: "user" },
 ];
 
+// หมวดหมู่ตั้งต้น — id เป็น bigserial จึงไล่จาก 1 ตามลำดับที่ insert
+const categories = [
+  { name: "กล้องและถ่ายภาพ", description: "กล้อง เลนส์ ขาตั้ง" },
+  { name: "คอมพิวเตอร์", description: "โน้ตบุ๊ก แท็บเล็ต" },
+  { name: "เสียงและแสง", description: "ไมค์ ไฟ ลำโพง" },
+  { name: "จอและการนำเสนอ", description: "โปรเจกเตอร์ จอ" },
+];
+
 const equipment: NewEquipment[] = [
-  { id: "e1", name: "กล้อง Canon EOS R50", description: "พร้อมเลนส์คิท 18-45mm", imageUrl: "https://picsum.photos/seed/camera/400/240", quantity: 2 },
-  { id: "e2", name: "โน้ตบุ๊ก Dell Latitude 5450", description: "i5 / RAM 16GB / SSD 512GB", imageUrl: "https://picsum.photos/seed/laptop/400/240", quantity: 3 },
-  { id: "e3", name: "ขาตั้งกล้อง Manfrotto", description: "สูงสุด 160 cm พร้อมกระเป๋า", imageUrl: "https://picsum.photos/seed/tripod/400/240", quantity: 4 },
-  { id: "e4", name: "ไมค์ Rode Wireless GO II", description: "ไมค์ไร้สาย 2 ตัว", imageUrl: null, quantity: 1 },
-  { id: "e5", name: "โปรเจกเตอร์ Epson EB-X06", description: "3600 lumens พร้อมสาย HDMI", imageUrl: "https://picsum.photos/seed/projector/400/240", quantity: 1 },
-  { id: "e6", name: "ไฟ LED Godox SL60", description: "พร้อมซอฟต์บ็อกซ์", imageUrl: "https://picsum.photos/seed/light/400/240", quantity: 6 },
+  { id: "e1", name: "กล้อง Canon EOS R50", description: "พร้อมเลนส์คิท 18-45mm", imageUrl: "https://picsum.photos/seed/camera/400/240", quantity: 2, categoryId: 1 },
+  { id: "e2", name: "โน้ตบุ๊ก Dell Latitude 5450", description: "i5 / RAM 16GB / SSD 512GB", imageUrl: "https://picsum.photos/seed/laptop/400/240", quantity: 3, categoryId: 2 },
+  { id: "e3", name: "ขาตั้งกล้อง Manfrotto", description: "สูงสุด 160 cm พร้อมกระเป๋า", imageUrl: "https://picsum.photos/seed/tripod/400/240", quantity: 4, categoryId: 1 },
+  { id: "e4", name: "ไมค์ Rode Wireless GO II", description: "ไมค์ไร้สาย 2 ตัว", imageUrl: null, quantity: 1, categoryId: 3 },
+  { id: "e5", name: "โปรเจกเตอร์ Epson EB-X06", description: "3600 lumens พร้อมสาย HDMI", imageUrl: "https://picsum.photos/seed/projector/400/240", quantity: 1, categoryId: 4 },
+  { id: "e6", name: "ไฟ LED Godox SL60", description: "พร้อมซอฟต์บ็อกซ์", imageUrl: "https://picsum.photos/seed/light/400/240", quantity: 6, categoryId: 3 },
 ];
 
 const borrows: NewBorrow[] = [
@@ -52,6 +61,7 @@ async function main() {
       // ลบตามลำดับ FK: borrows อ้างถึง equipment และ users
       await tx.delete(borrowsTable);
       await tx.delete(equipmentTable);
+      await tx.delete(categoriesTable);
       await tx.delete(usersTable);
       console.log("ล้างข้อมูลเดิมแล้ว");
     }
@@ -63,11 +73,12 @@ async function main() {
     }
 
     await tx.insert(usersTable).values(users);
+    await tx.insert(categoriesTable).values(categories);
     await tx.insert(equipmentTable).values(equipment);
     await tx.insert(borrowsTable).values(borrows);
 
     console.log(
-      `seed สำเร็จ: users ${users.length} / equipment ${equipment.length} / borrows ${borrows.length}`,
+      `seed สำเร็จ: users ${users.length} / categories ${categories.length} / equipment ${equipment.length} / borrows ${borrows.length}`,
     );
   });
 }

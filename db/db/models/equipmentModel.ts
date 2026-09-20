@@ -7,7 +7,12 @@
 import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 import { dbClient } from "@db/client.js";
-import { borrowsTable, equipmentTable, HOLDING_STATUSES } from "@db/schema.js";
+import {
+  borrowsTable,
+  categoriesTable,
+  equipmentTable,
+  HOLDING_STATUSES,
+} from "@db/schema.js";
 import { firstOrUndefined, holdingCountSql } from "@db/models/helpers.js";
 import { logModel } from "@db/models/logModel.js";
 import type { Actor } from "@db/models/borrowModel.js";
@@ -22,6 +27,8 @@ export type EquipmentRow = {
   imageUrl: string | null;
   quantity: number;
   available: number;
+  categoryId: number | null;
+  categoryName: string | null;
 };
 
 export type EquipmentInput = {
@@ -29,6 +36,7 @@ export type EquipmentInput = {
   description?: string | null;
   imageUrl?: string | null;
   quantity: number;
+  categoryId?: number | null;
 };
 
 // ดึง quantity กับจำนวนที่ถือของอยู่มาก่อน แล้วค่อยลบกันในชั้น JS
@@ -39,8 +47,17 @@ const selection = {
   description: equipmentTable.description,
   imageUrl: equipmentTable.imageUrl,
   quantity: equipmentTable.quantity,
+  categoryId: equipmentTable.categoryId,
+  categoryName: categoriesTable.name,
   holding: holdingCountSql,
 };
+
+// left join เพราะอุปกรณ์ไม่จำเป็นต้องมีหมวดหมู่
+const baseQuery = () =>
+  dbClient
+    .select(selection)
+    .from(equipmentTable)
+    .leftJoin(categoriesTable, eq(categoriesTable.id, equipmentTable.categoryId));
 
 const toEquipmentRow = (row: {
   id: string;
@@ -48,6 +65,8 @@ const toEquipmentRow = (row: {
   description: string;
   imageUrl: string | null;
   quantity: number;
+  categoryId: number | null;
+  categoryName: string | null;
   holding: number;
 }): EquipmentRow => {
   const { holding, ...rest } = row;
@@ -56,21 +75,12 @@ const toEquipmentRow = (row: {
 
 export const equipmentModel = {
   async listAll(): Promise<EquipmentRow[]> {
-    const rows = await dbClient
-      .select(selection)
-      .from(equipmentTable)
-      .orderBy(equipmentTable.createdAt);
-
+    const rows = await baseQuery().orderBy(equipmentTable.createdAt);
     return rows.map(toEquipmentRow);
   },
 
   async findById(id: string): Promise<EquipmentRow | undefined> {
-    const rows = await dbClient
-      .select(selection)
-      .from(equipmentTable)
-      .where(eq(equipmentTable.id, id))
-      .limit(1);
-
+    const rows = await baseQuery().where(eq(equipmentTable.id, id)).limit(1);
     const row = firstOrUndefined(rows);
     return row === undefined ? undefined : toEquipmentRow(row);
   },
@@ -99,6 +109,7 @@ export const equipmentModel = {
         description: input.description ?? "",
         imageUrl: input.imageUrl ?? null,
         quantity: input.quantity,
+        categoryId: input.categoryId ?? null,
       });
 
       await logModel.write(
@@ -133,6 +144,7 @@ export const equipmentModel = {
           description: input.description ?? "",
           imageUrl: input.imageUrl ?? null,
           quantity: input.quantity,
+          categoryId: input.categoryId ?? null,
         })
         .where(eq(equipmentTable.id, id));
 

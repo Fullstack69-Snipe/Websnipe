@@ -8,6 +8,7 @@ const MENU: { to: string; label: string; allow: Role[] }[] = [
   { to: '/my-borrows', label: 'การยืมของฉัน', allow: ['user', 'staff', 'admin'] },
   { to: '/manage/equipment', label: 'จัดการอุปกรณ์', allow: ['staff', 'admin'] },
   { to: '/manage/requests', label: 'คำขอยืม', allow: ['staff', 'admin'] },
+  { to: '/manage/categories', label: 'หมวดหมู่', allow: ['staff', 'admin'] },
   { to: '/admin/users', label: 'จัดการผู้ใช้', allow: ['admin'] },
 ]
 

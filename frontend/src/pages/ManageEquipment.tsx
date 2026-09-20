@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
-import type { Equipment, EquipmentInput } from '../types'
+import type { Category, Equipment, EquipmentInput } from '../types'
 import EquipmentForm from '../components/EquipmentForm'
 import EquipmentHistory from '../components/EquipmentHistory'
 
@@ -14,10 +14,13 @@ export default function ManageEquipment() {
   const [editing, setEditing] = useState<Editing>(null)
   // อุปกรณ์ที่กำลังเปิดดูประวัติอยู่
   const [historyOf, setHistoryOf] = useState<Equipment | null>(null)
+  const [categories, setCategories] = useState<Category[]>([])
 
   async function load() {
     try {
-      setItems(await api.listEquipment())
+      const [eq, cats] = await Promise.all([api.listEquipment(), api.listCategories()])
+      setItems(eq)
+      setCategories(cats)
     } catch {
       setError('โหลดรายการอุปกรณ์ไม่สำเร็จ')
     } finally {
@@ -81,6 +84,7 @@ export default function ManageEquipment() {
               <tr>
                 <th>รูป</th>
                 <th>ชื่อ</th>
+                <th>หมวดหมู่</th>
                 <th>รายละเอียด</th>
                 <th>จำนวน</th>
                 <th>เหลือ</th>
@@ -100,6 +104,9 @@ export default function ManageEquipment() {
                       )}
                     </td>
                     <td><strong>{item.name}</strong></td>
+                    <td className="muted">
+                      {item.categoryName ?? '—'}
+                    </td>
                     <td className="muted">{item.description}</td>
                     <td>{item.quantity}</td>
                     <td className={item.available === 0 ? 'overdue' : undefined}>
@@ -142,6 +149,7 @@ export default function ManageEquipment() {
 
       {editing && (
         <EquipmentForm
+          categories={categories}
           // key ทำให้ฟอร์ม reset ทุกครั้งที่เปลี่ยนชิ้นที่แก้
           key={editing === 'new' ? 'new' : editing.id}
           initial={editing === 'new' ? null : editing}

@@ -7,7 +7,7 @@ const { badRequest, notFound, conflict } = require('../utils/HttpError');
 
 // ตรวจ EquipmentInput = { name, description, imageUrl, quantity }
 function parseInput(body) {
-  const { name, description, imageUrl, quantity } = body;
+  const { name, description, imageUrl, quantity, categoryId } = body;
 
   if (typeof name !== 'string' || !name.trim()) {
     throw badRequest('กรุณากรอกชื่ออุปกรณ์');
@@ -18,8 +18,18 @@ function parseInput(body) {
     throw badRequest('จำนวนต้องเป็นจำนวนเต็มไม่ติดลบ');
   }
 
+  // categoryId ไม่บังคับ — null = ไม่ระบุหมวดหมู่
+  let category = null;
+  if (categoryId !== undefined && categoryId !== null && categoryId !== '') {
+    category = Number(categoryId);
+    if (!Number.isInteger(category) || category <= 0) {
+      throw badRequest('หมวดหมู่ไม่ถูกต้อง');
+    }
+  }
+
   return {
     name: name.trim(),
+    categoryId: category,
     description: typeof description === 'string' ? description.trim() : '',
     // imageUrl เป็น string | null ตาม types.ts
     imageUrl: typeof imageUrl === 'string' && imageUrl.trim() ? imageUrl.trim() : null,
