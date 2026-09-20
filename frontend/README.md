@@ -139,6 +139,6 @@ await api.createEquipment({ name, description, quantity, imageUrl: url })
   หน้าจอแค่แสดงผล ไม่ต้องคำนวณเอง
 - **"เกินกำหนด" ก็คำนวณหน้าจอเอง** จาก `status === 'approved'` กับ `dueDate < วันนี้`
   ไม่มีสถานะ overdue ในฐานข้อมูล
-- `axios` ติดตั้งไว้ใน `package.json` แต่ยังไม่ได้ใช้ที่ไหน (ทุกที่ใช้ `fetch`)
-- มีทั้ง `react-router` และ `react-router-dom` ใน dependencies แต่โค้ดทั้งหมด
-  import จาก `react-router-dom` อย่างเดียว
+- เรียก API ด้วย `fetch` ล้วน ไม่ได้ใช้ไลบรารี HTTP ตัวอื่น
+- เรื่อง routing ให้ import จาก `react-router-dom` เท่านั้น อย่า import จาก
+  `react-router` ตรงๆ เพราะจะได้คนละ instance กับที่ `react-router-dom` ใช้อยู่
