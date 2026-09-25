@@ -7,7 +7,15 @@ import type {
 const delay = (ms = 400) => new Promise((r) => setTimeout(r, ms))
 
 // ผู้ใช้ปัจจุบันของโหมด mock (VITE_USE_MOCK=true) — ตัวจริงมาจาก session ที่ backend
-export const CURRENT_USER_ID = 'u1'
+//
+// สลับ role ตอนพัฒนาได้ด้วย VITE_MOCK_ROLE ใน .env.local เช่น
+//   VITE_MOCK_ROLE=staff   -> เห็นเมนูจัดการอุปกรณ์ / คำขอยืม
+//   VITE_MOCK_ROLE=admin   -> เห็นเมนูจัดการผู้ใช้ด้วย
+//   ไม่ตั้ง                -> เป็นผู้ยืมธรรมดา
+const MOCK_USER_BY_ROLE: Record<Role, string> = { user: 'u1', staff: 'u2', admin: 'u3' }
+const MOCK_ROLE = (import.meta.env.VITE_MOCK_ROLE as Role) || 'user'
+
+export const CURRENT_USER_ID = MOCK_USER_BY_ROLE[MOCK_ROLE] ?? 'u1'
 
 // ---------- ข้อมูลตั้งต้น ----------
 let users: User[] = [
@@ -209,6 +217,16 @@ export const mockApi = {
     const b = findBorrow(borrowId)
     if (b.status !== 'approved') throw new Error('รายการนี้ยังไม่ได้อยู่ในสถานะยืม')
     return patchBorrow(borrowId, { status: 'returning' })
+  },
+
+  // ยกเลิกคำขอของตัวเอง — ทำได้เฉพาะตอนที่ยังรออนุมัติ
+  // ถ้าอนุมัติไปแล้วต้องใช้วิธี "แจ้งคืน" แทน เพราะของออกจากคลังไปแล้ว
+  async cancelBorrow(borrowId: string): Promise<Borrow> {
+    await delay()
+    const b = findBorrow(borrowId)
+    if (b.borrowerId !== CURRENT_USER_ID) throw new Error('ยกเลิกได้เฉพาะคำขอของตัวเอง')
+    if (b.status !== 'pending') throw new Error('ยกเลิกได้เฉพาะคำขอที่ยังรออนุมัติ')
+    return patchBorrow(borrowId, { status: 'cancelled' })
   },
 
   // ===== การยืม — ฝั่ง staff =====

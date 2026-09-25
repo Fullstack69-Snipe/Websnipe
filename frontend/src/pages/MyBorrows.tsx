@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import { api } from '../lib/api'
+import { useFeedback } from '../lib/useFeedback'
 import type { Borrow, BorrowStatus } from '../types'
 import StatusBadge from '../components/StatusBadge'
 
@@ -8,6 +9,7 @@ import StatusBadge from '../components/StatusBadge'
 const ACTIVE: BorrowStatus[] = ['pending', 'approved', 'returning']
 
 export default function MyBorrows() {
+  const { toast, confirm } = useFeedback()
   const [borrows, setBorrows] = useState<Borrow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -27,12 +29,36 @@ export default function MyBorrows() {
   }, [])
 
   async function handleReturn(id: string) {
-    if (!confirm('แจ้งคืนอุปกรณ์ชิ้นนี้? เจ้าหน้าที่จะตรวจรับและปิดรายการให้')) return
+    const ok = await confirm({
+      title: 'แจ้งคืนอุปกรณ์',
+      message: 'แจ้งคืนอุปกรณ์ชิ้นนี้? เจ้าหน้าที่จะตรวจรับและปิดรายการให้',
+      confirmLabel: 'แจ้งคืน',
+    })
+    if (!ok) return
     try {
       await api.requestReturn(id)
+      toast('แจ้งคืนเรียบร้อย รอเจ้าหน้าที่ตรวจรับ')
       await load()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
+      toast(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error')
+    }
+  }
+
+  async function handleCancel(id: string) {
+    const ok = await confirm({
+      title: 'ยกเลิกคำขอยืม',
+      message: 'ยกเลิกคำขอนี้? อุปกรณ์จะถูกปล่อยให้คนอื่นยืมได้ทันที',
+      confirmLabel: 'ยกเลิกคำขอ',
+      cancelLabel: 'ไม่ใช่ตอนนี้',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await api.cancelBorrow(id)
+      toast('ยกเลิกคำขอแล้ว')
+      await load()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error')
     }
   }
 
@@ -53,7 +79,7 @@ export default function MyBorrows() {
       {active.length === 0 ? (
         <article className="empty"><p>ยังไม่มีรายการยืม</p></article>
       ) : (
-        <BorrowTable rows={active} onReturn={handleReturn} />
+        <BorrowTable rows={active} onReturn={handleReturn} onCancel={handleCancel} />
       )}
 
       <h2>ประวัติ ({history.length})</h2>
@@ -70,9 +96,10 @@ export default function MyBorrows() {
 type TableProps = {
   rows: Borrow[]
   onReturn?: (id: string) => void
+  onCancel?: (id: string) => void
 }
 
-function BorrowTable({ rows, onReturn }: TableProps) {
+function BorrowTable({ rows, onReturn, onCancel }: TableProps) {
   return (
     <div className="table-wrap">
       <table>
@@ -106,11 +133,22 @@ function BorrowTable({ rows, onReturn }: TableProps) {
                 </td>
                 <td><StatusBadge status={b.status} /></td>
                 <td>
-                  {b.status === 'approved' && onReturn && (
-                    <button type="button" className="outline" onClick={() => onReturn(b.id)}>
-                      แจ้งคืน
-                    </button>
-                  )}
+                  <div className="actions">
+                    {b.status === 'pending' && onCancel && (
+                      <button
+                        type="button"
+                        className="outline secondary"
+                        onClick={() => onCancel(b.id)}
+                      >
+                        ยกเลิกคำขอ
+                      </button>
+                    )}
+                    {b.status === 'approved' && onReturn && (
+                      <button type="button" className="outline" onClick={() => onReturn(b.id)}>
+                        แจ้งคืน
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             )

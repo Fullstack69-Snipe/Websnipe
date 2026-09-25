@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/useAuth'
+import { useFeedback } from '../lib/useFeedback'
 import { ROLE_LABEL } from '../lib/labels'
 import type { Role, User } from '../types'
 
@@ -8,6 +9,7 @@ const ROLES: Role[] = ['user', 'staff', 'admin']
 
 export default function ManageUsers() {
   const { user: me } = useAuth()
+  const { toast, confirm } = useFeedback()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
@@ -26,12 +28,19 @@ export default function ManageUsers() {
 
   async function changeRole(u: User, role: Role) {
     if (role === u.role) return
-    if (!confirm(`เปลี่ยนสิทธิ์ของ ${u.fullName} เป็น "${ROLE_LABEL[role]}"?`)) return
+    const ok = await confirm({
+      title: 'เปลี่ยนสิทธิ์ผู้ใช้',
+      message: `เปลี่ยนสิทธิ์ของ ${u.fullName} เป็น "${ROLE_LABEL[role]}"?`,
+      confirmLabel: 'เปลี่ยนสิทธิ์',
+      danger: role === 'admin',
+    })
+    if (!ok) return
 
     setSaving(u.id)
     setError('')
     try {
       await api.updateUserRole(u.id, role)
+      toast(`เปลี่ยนสิทธิ์ ${u.fullName} เป็น "${ROLE_LABEL[role]}" แล้ว`)
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'เปลี่ยนสิทธิ์ไม่สำเร็จ')
@@ -45,7 +54,7 @@ export default function ManageUsers() {
   return (
     <section>
       <hgroup>
-        <h2>จัดการผู้ใช้</h2>
+        <h1>จัดการผู้ใช้</h1>
         <p>กำหนดสิทธิ์ให้ผู้ที่เข้าสู่ระบบแล้ว — ผู้ใช้ใหม่จะได้สิทธิ์ "ผู้ยืม" เสมอ</p>
       </hgroup>
 

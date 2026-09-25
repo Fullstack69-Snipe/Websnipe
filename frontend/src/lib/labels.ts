@@ -8,6 +8,7 @@ export const STATUS_LABEL: Record<BorrowStatus | EquipmentStatus, string> = {
   rejected: 'ถูกปฏิเสธ',
   returning: 'แจ้งคืนแล้ว',
   returned: 'คืนแล้ว',
+  cancelled: 'ยกเลิกแล้ว',
 }
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -25,4 +26,5 @@ export const LOG_ACTION_LABEL: Record<LogAction, string> = {
   borrow_rejected: 'ปฏิเสธ',
   borrow_return_requested: 'แจ้งคืน',
   borrow_returned: 'รับคืนแล้ว',
+  borrow_cancelled: 'ยกเลิกคำขอ',
 }

@@ -79,6 +79,9 @@ export const realApi = {
   requestReturn: (borrowId: string) =>
     send<Borrow>('PUT', `/borrows/${borrowId}/request-return`),
 
+  // ยกเลิกคำขอของตัวเอง (ทำได้เฉพาะสถานะ pending)
+  cancelBorrow: (borrowId: string) => send<Borrow>('PUT', `/borrows/${borrowId}/cancel`),
+
   // ===== การยืม — ฝั่ง staff =====
   listBorrows: () => get<Borrow[]>('/borrows'),
 

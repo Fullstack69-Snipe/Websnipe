@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import { api } from '../lib/api'
+import { useFeedback } from '../lib/useFeedback'
 import type { Borrow } from '../types'
 import StatusBadge from '../components/StatusBadge'
 
@@ -17,6 +18,7 @@ const isHolding = (b: Borrow) => b.status === 'approved' || b.status === 'return
 const isOverdue = (b: Borrow) => isHolding(b) && dayjs().isAfter(dayjs(b.dueDate), 'day')
 
 export default function BorrowRequests() {
+  const { toast, confirm, prompt } = useFeedback()
   const [borrows, setBorrows] = useState<Borrow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -38,14 +40,19 @@ export default function BorrowRequests() {
   }, [])
 
   // รวม logic ที่ซ้ำกันของทั้ง 3 ปุ่มไว้ที่เดียว
-  async function act(id: string, fn: (id: string) => Promise<unknown>, confirmMsg?: string) {
-    if (confirmMsg && !confirm(confirmMsg)) return
+  async function act(
+    id: string,
+    fn: (id: string) => Promise<unknown>,
+    options?: { confirmMsg: string; successMsg: string; danger?: boolean },
+  ) {
+    if (options && !(await confirm({ message: options.confirmMsg, danger: options.danger }))) return
     setActing(id)
     try {
       await fn(id)
+      if (options) toast(options.successMsg)
       await load()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
+      toast(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error')
     } finally {
       setActing(null)
     }
@@ -62,7 +69,8 @@ export default function BorrowRequests() {
   const visible = borrows.filter((b) => {
     if (tab === 'pending') return b.status === 'pending'
     if (tab === 'active') return isHolding(b)
-    if (tab === 'done') return b.status === 'returned' || b.status === 'rejected'
+    if (tab === 'done')
+      return b.status === 'returned' || b.status === 'rejected' || b.status === 'cancelled'
     return true
   })
 
@@ -146,7 +154,12 @@ export default function BorrowRequests() {
                             <button
                               type="button"
                               aria-busy={busy}
-                              onClick={() => act(b.id, api.approveBorrow)}
+                              onClick={() =>
+                                act(b.id, api.approveBorrow, {
+                                  confirmMsg: `อนุมัติให้ ${b.borrowerName} ยืม "${b.equipmentName}"?`,
+                                  successMsg: 'อนุมัติคำขอแล้ว',
+                                })
+                              }
                             >
                               อนุมัติ
                             </button>
@@ -154,14 +167,22 @@ export default function BorrowRequests() {
                               type="button"
                               className="outline secondary"
                               disabled={busy}
-                              onClick={() => {
-                                // เหตุผลไม่บังคับ กด OK ทั้งที่ว่างก็ปฏิเสธได้
-                                const reason = prompt(
-                                  `ปฏิเสธคำขอของ ${b.borrowerName}
-เหตุผล (ไม่บังคับ):`,
-                                )
+                              onClick={async () => {
+                                // เหตุผลไม่บังคับ กดยืนยันทั้งที่ว่างก็ปฏิเสธได้
+                                const reason = await prompt({
+                                  title: 'ปฏิเสธคำขอ',
+                                  message: `ปฏิเสธคำขอของ ${b.borrowerName}`,
+                                  label: 'เหตุผล (ไม่บังคับ)',
+                                  placeholder: 'เช่น อุปกรณ์ต้องใช้งานในวันนั้น',
+                                  multiline: true,
+                                  confirmLabel: 'ปฏิเสธ',
+                                  danger: true,
+                                })
                                 if (reason === null) return
-                                act(b.id, (id) => api.rejectBorrow(id, reason.trim() || undefined))
+                                await act(b.id, (id) =>
+                                  api.rejectBorrow(id, reason.trim() || undefined),
+                                )
+                                toast('ปฏิเสธคำขอแล้ว')
                               }}
                             >
                               ปฏิเสธ
@@ -173,13 +194,20 @@ export default function BorrowRequests() {
                             type="button"
                             className="outline"
                             aria-busy={busy}
-                            onClick={() => {
-                              const note = prompt(
-                                `ยืนยันรับคืน "${b.equipmentName}"
-สภาพของตอนคืน (ไม่บังคับ):`,
-                              )
+                            onClick={async () => {
+                              const note = await prompt({
+                                title: 'รับคืนอุปกรณ์',
+                                message: `ยืนยันรับคืน "${b.equipmentName}" จาก ${b.borrowerName}`,
+                                label: 'สภาพของตอนคืน (ไม่บังคับ)',
+                                placeholder: 'เช่น สภาพปกติ ครบถ้วน',
+                                multiline: true,
+                                confirmLabel: 'รับคืน',
+                              })
                               if (note === null) return
-                              act(b.id, (id) => api.confirmReturn(id, note.trim() || undefined))
+                              await act(b.id, (id) =>
+                                api.confirmReturn(id, note.trim() || undefined),
+                              )
+                              toast('รับคืนอุปกรณ์เรียบร้อย')
                             }}
                           >
                             รับคืน

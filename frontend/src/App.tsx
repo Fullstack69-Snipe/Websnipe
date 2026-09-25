@@ -1,6 +1,7 @@
 import './App.css'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './lib/auth'
+import { FeedbackProvider } from './lib/feedback'
 import { useAuth } from './lib/useAuth'
 import Layout from './components/Layout'
 import SignIn from './pages/SignIn'
@@ -38,6 +39,7 @@ const STAFF: Role[] = ['staff', 'admin']
 export default function App() {
   return (
     <AuthProvider>
+      <FeedbackProvider>
       <Routes>
           <Route path="/signin" element={<SignInRoute />} />
 
@@ -86,6 +88,7 @@ export default function App() {
             />
           </Route>
       </Routes>
+      </FeedbackProvider>
     </AuthProvider>
   )
 }

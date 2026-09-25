@@ -1,10 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../lib/api'
+import { useFeedback } from '../lib/useFeedback'
 import type { Category } from '../types'
 
 // หมวดหมู่อุปกรณ์ — staff/admin จัดการได้
 // ลบหมวดหมู่ไม่ทำให้อุปกรณ์หาย แค่กลายเป็น "ไม่ระบุหมวดหมู่"
 export default function ManageCategories() {
+  const { toast, confirm } = useFeedback()
   const [items, setItems] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -61,13 +63,20 @@ export default function ManageCategories() {
   async function handleDelete(c: Category) {
     const warn =
       c.equipmentCount > 0
-        ? `ลบ "${c.name}"?\nอุปกรณ์ ${c.equipmentCount} ชิ้นจะกลายเป็นไม่ระบุหมวดหมู่ (ไม่ถูกลบ)`
+        ? `ลบ "${c.name}"? อุปกรณ์ ${c.equipmentCount} ชิ้นจะกลายเป็นไม่ระบุหมวดหมู่ (ไม่ถูกลบ)`
         : `ลบ "${c.name}"?`
-    if (!confirm(warn)) return
+    const ok = await confirm({
+      title: 'ลบหมวดหมู่',
+      message: warn,
+      confirmLabel: 'ลบ',
+      danger: true,
+    })
+    if (!ok) return
 
     setError('')
     try {
       await api.deleteCategory(c.id)
+      toast(`ลบหมวดหมู่ "${c.name}" แล้ว`)
       if (editing?.id === c.id) reset()
       await load()
     } catch (err) {
@@ -80,7 +89,7 @@ export default function ManageCategories() {
   return (
     <section>
       <hgroup>
-        <h2>หมวดหมู่อุปกรณ์</h2>
+        <h1>หมวดหมู่อุปกรณ์</h1>
         <p>ใช้จัดกลุ่มอุปกรณ์ให้ผู้ยืมหาของเจอง่ายขึ้น</p>
       </hgroup>
 

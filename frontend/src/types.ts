@@ -1,6 +1,12 @@
 export type Role = 'user' | 'staff' | 'admin'
 export type EquipmentStatus = 'available' | 'borrowed'
-export type BorrowStatus = 'pending' | 'approved' | 'rejected' | 'returning' | 'returned'
+export type BorrowStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'returning'
+  | 'returned'
+  | 'cancelled'   // ผู้ยืมกดยกเลิกเอง ขณะที่ยังรออนุมัติ
 
 export type User = {
   id: string
@@ -66,6 +72,7 @@ export type LogAction =
   | 'borrow_rejected'
   | 'borrow_return_requested'
   | 'borrow_returned'
+  | 'borrow_cancelled'
 
 export type EquipmentLog = {
   id: number

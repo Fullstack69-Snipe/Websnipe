@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import { api } from '../lib/api'
+import { useFeedback } from '../lib/useFeedback'
 import type { Category, Equipment, EquipmentStatus } from '../types'
 import EquipmentCard from '../components/EquipmentCard'
 
 type Filter = 'all' | EquipmentStatus
 
 export default function EquipmentList() {
+  const { toast } = useFeedback()
   const [items, setItems] = useState<Equipment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -54,9 +56,9 @@ export default function EquipmentList() {
       await api.requestBorrow(target.id, dueDate, purpose.trim() || undefined)
       setTarget(null)
       setPurpose('')
-      alert('ส่งคำขอยืมเรียบร้อย รอเจ้าหน้าที่อนุมัติ')
+      toast('ส่งคำขอยืมเรียบร้อย รอเจ้าหน้าที่อนุมัติ')
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด')
+      toast(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error')
     } finally {
       setSubmitting(false)
     }

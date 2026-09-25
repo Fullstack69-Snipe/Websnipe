@@ -1,4 +1,5 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { useFeedback } from '../lib/useFeedback'
 import type { Category, Equipment, EquipmentInput } from '../types'
 
 type Props = {
@@ -9,6 +10,7 @@ type Props = {
 }
 
 export default function EquipmentForm({ initial, categories, onSubmit, onClose }: Props) {
+  const { toast } = useFeedback()
   const [name, setName] = useState(initial?.name ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [quantity, setQuantity] = useState(initial?.quantity ?? 1)
@@ -27,8 +29,8 @@ export default function EquipmentForm({ initial, categories, onSubmit, onClose }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!name.trim()) return alert('กรุณากรอกชื่ออุปกรณ์')
-    if (quantity < 1) return alert('จำนวนต้องอย่างน้อย 1 ชิ้น')
+    if (!name.trim()) return toast('กรุณากรอกชื่ออุปกรณ์', 'error')
+    if (quantity < 1) return toast('จำนวนต้องอย่างน้อย 1 ชิ้น', 'error')
 
     setSaving(true)
     try {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
+import { useFeedback } from '../lib/useFeedback'
 import type { Category, Equipment, EquipmentInput } from '../types'
 import EquipmentForm from '../components/EquipmentForm'
 import EquipmentHistory from '../components/EquipmentHistory'
@@ -8,6 +9,7 @@ import EquipmentHistory from '../components/EquipmentHistory'
 type Editing = null | 'new' | Equipment
 
 export default function ManageEquipment() {
+  const { toast, confirm } = useFeedback()
   const [items, setItems] = useState<Equipment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -42,17 +44,24 @@ export default function ManageEquipment() {
       setEditing(null)
       await load()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ')
+      toast(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ', 'error')
     }
   }
 
   async function handleDelete(item: Equipment) {
-    if (!confirm(`ลบ "${item.name}" ออกจากระบบ?`)) return
+    const ok = await confirm({
+      title: 'ลบอุปกรณ์',
+      message: `ลบ "${item.name}" ออกจากระบบ? การลบนี้ย้อนกลับไม่ได้`,
+      confirmLabel: 'ลบ',
+      danger: true,
+    })
+    if (!ok) return
     try {
       await api.deleteEquipment(item.id)
+      toast(`ลบ "${item.name}" แล้ว`)
       await load()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'ลบไม่สำเร็จ')
+      toast(err instanceof Error ? err.message : 'ลบไม่สำเร็จ', 'error')
     }
   }
 
@@ -83,9 +92,9 @@ export default function ManageEquipment() {
             <thead>
               <tr>
                 <th>รูป</th>
-                <th>ชื่อ</th>
+                <th className="col-name">ชื่อ</th>
                 <th>หมวดหมู่</th>
-                <th>รายละเอียด</th>
+                <th className="col-detail">รายละเอียด</th>
                 <th>จำนวน</th>
                 <th>เหลือ</th>
                 <th></th>
@@ -103,11 +112,11 @@ export default function ManageEquipment() {
                         <div className="thumb thumb--empty">ไม่มีรูป</div>
                       )}
                     </td>
-                    <td><strong>{item.name}</strong></td>
+                    <td className="col-name"><strong>{item.name}</strong></td>
                     <td className="muted">
                       {item.categoryName ?? '—'}
                     </td>
-                    <td className="muted">{item.description}</td>
+                    <td className="muted col-detail">{item.description}</td>
                     <td>{item.quantity}</td>
                     <td className={item.available === 0 ? 'overdue' : undefined}>
                       {item.available}
