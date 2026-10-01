@@ -7,12 +7,13 @@
 // ถ้าแยกกันเขียนจะมีจังหวะที่สถานะเปลี่ยนแล้วแต่ log หาย ประวัติจะเชื่อไม่ได้
 
 import crypto from "node:crypto";
-import { desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { dbClient } from "@db/client.js";
 import {
   borrowsTable,
   equipmentTable,
+  HOLDING_STATUSES,
   usersTable,
   type BorrowStatus,
   type LogAction,
@@ -22,6 +23,21 @@ import { logModel } from "@db/models/logModel.js";
 
 /** ผู้ที่ลงมือทำ ใช้บันทึกลงประวัติ */
 export type Actor = { id: string; fullName: string };
+
+/**
+ * เปลี่ยนสถานะไม่ได้ เพราะข้อมูลเปลี่ยนไประหว่างที่ controller ตรวจกับตอนเขียนจริง
+ *   status_changed — มีคนเปลี่ยนสถานะไปก่อน เช่น ผู้ยืมกดยกเลิกจังหวะเดียวกับที่ staff กดอนุมัติ
+ *   unavailable    — ของชิ้นสุดท้ายถูกอนุมัติให้คนอื่นไปก่อน
+ */
+export class BorrowConflictError extends Error {
+  readonly reason: "status_changed" | "unavailable";
+
+  constructor(reason: BorrowConflictError["reason"]) {
+    super(reason);
+    this.reason = reason;
+    this.name = "BorrowConflictError";
+  }
+}
 
 export type BorrowRow = {
   id: string;
@@ -92,6 +108,7 @@ const ACTION_FOR: Partial<Record<BorrowStatus, LogAction>> = {
   rejected: "borrow_rejected",
   returning: "borrow_return_requested",
   returned: "borrow_returned",
+  cancelled: "borrow_cancelled",
 };
 
 export const borrowModel = {
@@ -164,16 +181,60 @@ export const borrowModel = {
    *
    * ต้องดูแล returnedAt ไปด้วย เพราะ schema มี CHECK บังคับว่า returned_at
    * จะมีค่าก็ต่อเมื่อ status = 'returned'
+   *
+   * `from` = สถานะที่ยอมให้เปลี่ยนออกมาได้ ตรวจซ้ำหลังล็อกแถวแล้ว
+   * ไม่ตรง -> โยน BorrowConflictError
    */
   async setStatus(
     id: string,
     status: BorrowStatus,
-    opts: { actor?: Actor; reason?: string | null; note?: string | null } = {},
+    opts: {
+      actor?: Actor;
+      reason?: string | null;
+      note?: string | null;
+      from?: readonly BorrowStatus[];
+    } = {},
   ): Promise<BorrowRow | undefined> {
     const before = await borrowModel.findById(id);
     if (!before) return undefined;
 
     await dbClient.transaction(async (tx) => {
+      // controller ตรวจสถานะมาแล้วก็จริง แต่ถ้าสองคนกดพร้อมกันจะผ่านการตรวจนั้นทั้งคู่
+      // จึงล็อกแถวแล้วตรวจซ้ำ คนที่มาทีหลังจะรอจนคนแรก commit แล้วเห็นสถานะใหม่
+      const [current] = await tx
+        .select({ status: borrowsTable.status })
+        .from(borrowsTable)
+        .where(eq(borrowsTable.id, id))
+        .for("update");
+
+      if (!current || (opts.from && !opts.from.includes(current.status))) {
+        throw new BorrowConflictError("status_changed");
+      }
+
+      if (status === "approved") {
+        // ล็อกแถว equipment ให้การอนุมัติของชิ้นเดียวกันต่อคิวกัน
+        // แล้วค่อยนับในอีกคำสั่ง — คำสั่งใหม่ได้ snapshot ใหม่ จึงเห็นการอนุมัติที่เพิ่ง commit
+        const [item] = await tx
+          .select({ quantity: equipmentTable.quantity })
+          .from(equipmentTable)
+          .where(eq(equipmentTable.id, before.equipmentId))
+          .for("update");
+
+        const [holding] = await tx
+          .select({ n: count() })
+          .from(borrowsTable)
+          .where(
+            and(
+              eq(borrowsTable.equipmentId, before.equipmentId),
+              inArray(borrowsTable.status, [...HOLDING_STATUSES]),
+            ),
+          );
+
+        if (!item || (holding?.n ?? 0) >= item.quantity) {
+          throw new BorrowConflictError("unavailable");
+        }
+      }
+
       const isReturned = status === "returned";
       const isDecision = status === "approved" || status === "rejected";
 
@@ -203,7 +264,7 @@ export const borrowModel = {
             actorId: opts.actor?.id ?? null,
             actorName: opts.actor?.fullName ?? "(ระบบ)",
             action,
-            fromStatus: before.status,
+            fromStatus: current.status,
             toStatus: status,
             note: opts.reason ?? opts.note ?? null,
           },
@@ -219,7 +280,10 @@ export const borrowModel = {
     id: string,
     opts: { actor?: Actor; note?: string | null } = {},
   ): Promise<BorrowRow | undefined> {
-    return borrowModel.setStatus(id, "returned", opts);
+    return borrowModel.setStatus(id, "returned", {
+      ...opts,
+      from: HOLDING_STATUSES,
+    });
   },
 };
 

@@ -38,6 +38,7 @@ export {
 
 export {
   borrowModel,
+  BorrowConflictError,
   type Actor,
   type BorrowRow,
 } from "@db/models/borrowModel.js";

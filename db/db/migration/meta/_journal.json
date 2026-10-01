@@ -36,6 +36,13 @@
       "when": 1789945784234,
       "tag": "0004_closed_serpent_society",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790871327728,
+      "tag": "0005_lumpy_northstar",
+      "breakpoints": true
     }
   ]
 }

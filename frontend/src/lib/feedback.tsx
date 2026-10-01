@@ -1,4 +1,5 @@
-import { createContext, useCallback, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
+import { FeedbackContext } from './useFeedback'
 
 export type ToastType = 'success' | 'error' | 'info'
 
@@ -33,8 +34,6 @@ export type FeedbackValue = {
   /** คืน string ที่กรอก หรือ null ถ้ากดยกเลิก (ข้อความว่างถือว่ากรอกแล้ว) */
   prompt: (options: PromptOptions) => Promise<string | null>
 }
-
-export const FeedbackContext = createContext<FeedbackValue | null>(null)
 
 export function FeedbackProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])

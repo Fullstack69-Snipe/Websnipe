@@ -154,6 +154,85 @@ const STAFF = { as: 'staff' };
     check('ปฏิเสธแล้วไม่กระทบจำนวนคงเหลือ', (await call('GET', '/equipment/e6')).body.available === before);
   }
 
+  console.log('\n-- ยกเลิกคำขอ --');
+  {
+    const before = (await call('GET', '/equipment/e3')).body.available;
+    const created = await call('POST', '/borrows', { body: { equipmentId: 'e3', dueDate: '2030-01-01' } });
+    const id = created.body.id;
+
+    check('staff ยกเลิกคำขอของคนอื่นไม่ได้ -> 403',
+      (await call('PUT', `/borrows/${id}/cancel`, STAFF)).status === 403);
+
+    const cancelled = await call('PUT', `/borrows/${id}/cancel`);
+    check('cancelBorrow -> คืน Borrow สถานะ cancelled',
+      cancelled.status === 200 && cancelled.body.id === id && cancelled.body.status === 'cancelled',
+      JSON.stringify(cancelled.body));
+    check('ยกเลิกแล้วไม่กระทบจำนวนคงเหลือ', (await call('GET', '/equipment/e3')).body.available === before);
+
+    const again = await call('PUT', `/borrows/${id}/cancel`);
+    check('ยกเลิกซ้ำ -> "ยกเลิกได้เฉพาะคำขอที่รออนุมัติเท่านั้น"',
+      again.status === 409 && again.body.error === 'ยกเลิกได้เฉพาะคำขอที่รออนุมัติเท่านั้น', again.body.error);
+
+    const approve = await call('PUT', `/borrows/${id}/approve`, STAFF);
+    check('อนุมัติรายการที่ยกเลิกแล้ว -> 409', approve.status === 409, approve.body.error);
+
+    const { body: logs } = await call('GET', '/equipment/e3/logs', STAFF);
+    check('บันทึก borrow_cancelled ลงประวัติ',
+      logs.some((l) => l.borrowId === id && l.action === 'borrow_cancelled' && l.toStatus === 'cancelled'));
+  }
+
+  console.log('\n-- กดพร้อมกัน --');
+  {
+    const { body: item } = await call('POST', '/equipment', {
+      ...STAFF,
+      body: { name: 'ชิ้นเดียว', description: '', imageUrl: null, quantity: 1 }
+    });
+    // ยิงหลายคำขอพร้อมกัน — ถ้าแค่สองคำขอ จังหวะมักไม่ซ้อนกันจริง เทสต์จะผ่านทั้งที่โค้ดมีปัญหา
+    const ids = [];
+    for (let i = 0; i < 5; i++) {
+      ids.push((await call('POST', '/borrows', { body: { equipmentId: item.id, dueDate: '2030-01-01' } })).body.id);
+    }
+
+    const results = await Promise.all(ids.map((id) => call('PUT', `/borrows/${id}/approve`, STAFF)));
+    const won = ids.filter((_, i) => results[i].status === 200);
+    check('อนุมัติชิ้นสุดท้ายพร้อมกันหลายคำขอ -> ผ่านแค่หนึ่ง',
+      won.length === 1 && results.every((r) => r.status === 200 || r.status === 409),
+      results.map((r) => r.status).join(','));
+    const avail = (await call('GET', `/equipment/${item.id}`)).body.available;
+    check('คงเหลือไม่ติดลบ', avail === 0, `available=${avail}`);
+
+    for (const id of won) await call('PUT', `/borrows/${id}/confirm-return`, STAFF);
+
+    // ผู้ยืมกดยกเลิกจังหวะเดียวกับที่ staff กดอนุมัติ — ต้องสำเร็จแค่ฝั่งเดียว
+    const c = (await call('POST', '/borrows', { body: { equipmentId: item.id, dueDate: '2030-01-01' } })).body.id;
+    const [cancel, approve] = await Promise.all([
+      call('PUT', `/borrows/${c}/cancel`),
+      call('PUT', `/borrows/${c}/approve`, STAFF),
+    ]);
+    const final = (await call('GET', '/borrows', STAFF)).body.find((x) => x.id === c).status;
+    check('ยกเลิกกับอนุมัติพร้อมกัน -> สำเร็จฝั่งเดียว และสถานะตรงกับฝั่งที่ชนะ',
+      [cancel.status, approve.status].sort().join(',') === '200,409' &&
+        final === (cancel.status === 200 ? 'cancelled' : 'approved'),
+      `cancel=${cancel.status} approve=${approve.status} final=${final}`);
+    if (final === 'approved') await call('PUT', `/borrows/${c}/confirm-return`, STAFF);
+
+    await call('DELETE', `/equipment/${item.id}`, STAFF);
+  }
+
+  console.log('\n-- วันครบกำหนดคิดตามเวลาไทย --');
+  {
+    const bangkok = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok' });
+    const today = bangkok.format(new Date());
+    const yesterday = bangkok.format(new Date(Date.now() - 24 * 60 * 60 * 1000));
+
+    const ok = await call('POST', '/borrows', { body: { equipmentId: 'e3', dueDate: today } });
+    check('คืนภายในวันนี้ (เวลาไทย) ได้', ok.status === 201, ok.body.error);
+    if (ok.status === 201) await call('PUT', `/borrows/${ok.body.id}/cancel`);
+
+    const past = await call('POST', '/borrows', { body: { equipmentId: 'e3', dueDate: yesterday } });
+    check('เมื่อวาน (เวลาไทย) -> 400', past.status === 400, past.body.error);
+  }
+
   console.log('\n-- CRUD อุปกรณ์ --');
   {
     const created = await call('POST', '/equipment', {

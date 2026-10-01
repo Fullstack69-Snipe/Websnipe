@@ -38,7 +38,8 @@ POSTGRES_HOST=localhost pnpm dev
 BASE=http://localhost:6002/api node db/smoke-test.js
 ```
 
-39 เคส ครอบคลุมทุก endpoint, ทุกสิทธิ์, ข้อความ error และวงจรการยืมทั้งวงจร
+50 เคส ครอบคลุมทุก endpoint, ทุกสิทธิ์, ข้อความ error, วงจรการยืมทั้งวงจร
+และกรณีกดพร้อมกัน (อนุมัติชิ้นสุดท้ายซ้อนกัน, ยกเลิกจังหวะเดียวกับอนุมัติ)
 สคริปต์สร้าง session ใส่ฐานข้อมูลโดยตรงเพื่อใช้ทดสอบ แล้วลบทิ้งเมื่อจบ
 (ไม่มีช่องทางลัดใดๆ ในตัว backend)
 
@@ -71,6 +72,7 @@ BASE=http://localhost:6002/api node db/smoke-test.js
 | `POST /categories` · `PUT /categories/:id` · `DELETE /categories/:id` | staff, admin |
 | `POST /borrows` | ทุกคน |
 | `GET /borrows/mine` | ทุกคน |
+| `PUT /borrows/:id/cancel` | เจ้าของรายการเท่านั้น (เฉพาะสถานะ `pending`) |
 | `PUT /borrows/:id/request-return` | เจ้าของรายการ (staff/admin ทำแทนได้) |
 | `GET /borrows` | staff, admin |
 | `PUT /borrows/:id/approve` · `/reject` · `/confirm-return` | staff, admin |
@@ -157,6 +159,10 @@ cors -> json -> cookieParser -> /uploads (static) -> /api/health
 - ลบอุปกรณ์ที่กำลังถูกยืมอยู่ไม่ได้ ถ้าลบได้จะลบประวัติการยืมที่จบแล้วตามไปด้วย
   (FK เป็น `ON DELETE RESTRICT`)
 - แจ้งคืนได้เฉพาะรายการของตัวเอง ยกเว้น staff/admin ทำแทนได้
+- ยกเลิกคำขอได้เฉพาะเจ้าของ และเฉพาะตอนที่ยัง `pending` — อนุมัติแล้วต้องใช้การแจ้งคืนแทน
+- วันครบกำหนดต้องไม่ก่อน "วันนี้" ตามเวลาไทย (Asia/Bangkok) ไม่ใช่ UTC
+- การเปลี่ยนสถานะล็อกแถวแล้วตรวจซ้ำในทรานแซกชัน ถ้ามีคนเปลี่ยนไปก่อน
+  (เช่น สองคนอนุมัติชิ้นสุดท้ายพร้อมกัน) คนที่มาทีหลังได้ 409
 - "เกินกำหนด" ไม่ใช่สถานะในฐานข้อมูล แต่คำนวณจาก `approved` + `dueDate < วันนี้`
 - ทุกการเปลี่ยนสถานะบันทึกลง `equipment_logs` พร้อมว่าใครเป็นคนทำ
   และเก็บ `approved_by` / `received_by` / `reject_reason` / `return_note` ไว้ในแถวการยืมด้วย

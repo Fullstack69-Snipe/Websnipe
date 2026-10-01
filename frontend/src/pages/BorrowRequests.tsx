@@ -40,16 +40,22 @@ export default function BorrowRequests() {
   }, [])
 
   // รวม logic ที่ซ้ำกันของทั้ง 3 ปุ่มไว้ที่เดียว
+  // successMsg ต้องส่งเข้ามาที่นี่ ไม่ใช่ toast ต่อท้ายหลัง await act(...)
+  // เพราะ act กลืน error ไว้เอง ถ้า toast ข้างนอกจะขึ้น "สำเร็จ" ทั้งที่ล้มเหลว
   async function act(
     id: string,
     fn: (id: string) => Promise<unknown>,
-    options?: { confirmMsg: string; successMsg: string; danger?: boolean },
+    options: { confirmMsg?: string; successMsg?: string; danger?: boolean } = {},
   ) {
-    if (options && !(await confirm({ message: options.confirmMsg, danger: options.danger }))) return
+    if (
+      options.confirmMsg &&
+      !(await confirm({ message: options.confirmMsg, danger: options.danger }))
+    )
+      return
     setActing(id)
     try {
       await fn(id)
-      if (options) toast(options.successMsg)
+      if (options.successMsg) toast(options.successMsg)
       await load()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error')
@@ -179,10 +185,11 @@ export default function BorrowRequests() {
                                   danger: true,
                                 })
                                 if (reason === null) return
-                                await act(b.id, (id) =>
-                                  api.rejectBorrow(id, reason.trim() || undefined),
+                                await act(
+                                  b.id,
+                                  (id) => api.rejectBorrow(id, reason.trim() || undefined),
+                                  { successMsg: 'ปฏิเสธคำขอแล้ว' },
                                 )
-                                toast('ปฏิเสธคำขอแล้ว')
                               }}
                             >
                               ปฏิเสธ
@@ -204,10 +211,11 @@ export default function BorrowRequests() {
                                 confirmLabel: 'รับคืน',
                               })
                               if (note === null) return
-                              await act(b.id, (id) =>
-                                api.confirmReturn(id, note.trim() || undefined),
+                              await act(
+                                b.id,
+                                (id) => api.confirmReturn(id, note.trim() || undefined),
+                                { successMsg: 'รับคืนอุปกรณ์เรียบร้อย' },
                               )
-                              toast('รับคืนอุปกรณ์เรียบร้อย')
                             }}
                           >
                             รับคืน

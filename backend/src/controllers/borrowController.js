@@ -1,4 +1,5 @@
 
+const { BorrowConflictError } = require('db');
 const borrowModel = require('../models/borrowModel');
 const equipmentModel = require('../models/equipmentModel');
 
@@ -10,6 +11,35 @@ const {
 } = require('../utils/HttpError');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// "วันนี้" ต้องเป็นวันที่ตามเวลาไทย ไม่ใช่ UTC
+// ไม่งั้นช่วงเที่ยงคืนถึงตีเจ็ด ระบบจะยังถือว่าเป็นเมื่อวาน และยอมให้ใส่วันครบกำหนดย้อนหลังได้
+// en-CA จัดรูปแบบเป็น YYYY-MM-DD พอดี
+const todayFmt = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Bangkok'
+});
+
+const today = () => todayFmt.format(new Date());
+
+const CONFLICT_MESSAGE = {
+  status_changed:
+    'รายการนี้ถูกเปลี่ยนสถานะไปแล้ว กรุณารีเฟรชหน้า',
+  unavailable:
+    'อุปกรณ์หมดแล้ว ถูกอนุมัติให้คนอื่นไปก่อน'
+};
+
+// model ตรวจสถานะซ้ำหลังล็อกแถว (กันสองคนกดพร้อมกัน)
+// ถ้าแพ้จังหวะจะโยน BorrowConflictError — แปลงเป็น 409 ตรงนี้
+async function transition(promise) {
+  try {
+    return await promise;
+  } catch (err) {
+    if (err instanceof BorrowConflictError) {
+      throw conflict(CONFLICT_MESSAGE[err.reason]);
+    }
+    throw err;
+  }
+}
 
 const borrowController = {
 
@@ -41,9 +71,7 @@ const borrowController = {
       throw conflict('อุปกรณ์ชิ้นนี้ถูกยืมหมดแล้ว');
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-
-    if (dueDate < today) {
+    if (dueDate < today()) {
       throw badRequest(
         'วันครบกำหนดคืนต้องไม่ใช่วันที่ผ่านมาแล้ว'
       );
@@ -75,7 +103,7 @@ const borrowController = {
   },
 
   // =========================================
-  // ยกเลิกคำขอยืม (เพิ่มใหม่)
+  // ยกเลิกคำขอยืม
   // =========================================
 
   // PUT /api/borrows/:id/cancel
@@ -108,18 +136,18 @@ const borrowController = {
     }
 
     // เปลี่ยนสถานะเป็น cancelled
-    const updated = await borrowModel.setStatus(
-      borrow.id,
-      'cancelled',
-      {
-        actor: req.user
-      }
+    res.json(
+      await transition(
+        borrowModel.setStatus(
+          borrow.id,
+          'cancelled',
+          {
+            actor: req.user,
+            from: ['pending']
+          }
+        )
+      )
     );
-
-    res.json({
-      message: 'ยกเลิกคำขอยืมสำเร็จ',
-      borrow: updated
-    });
   },
 
   // =========================================
@@ -154,10 +182,15 @@ const borrowController = {
     }
 
     res.json(
-      await borrowModel.setStatus(
-        borrow.id,
-        'returning',
-        { actor: req.user }
+      await transition(
+        borrowModel.setStatus(
+          borrow.id,
+          'returning',
+          {
+            actor: req.user,
+            from: ['approved']
+          }
+        )
       )
     );
   },
@@ -199,10 +232,15 @@ const borrowController = {
     }
 
     res.json(
-      await borrowModel.setStatus(
-        borrow.id,
-        'approved',
-        { actor: req.user }
+      await transition(
+        borrowModel.setStatus(
+          borrow.id,
+          'approved',
+          {
+            actor: req.user,
+            from: ['pending']
+          }
+        )
       )
     );
   },
@@ -230,13 +268,16 @@ const borrowController = {
         : null;
 
     res.json(
-      await borrowModel.setStatus(
-        borrow.id,
-        'rejected',
-        {
-          actor: req.user,
-          reason
-        }
+      await transition(
+        borrowModel.setStatus(
+          borrow.id,
+          'rejected',
+          {
+            actor: req.user,
+            reason,
+            from: ['pending']
+          }
+        )
       )
     );
   },
@@ -267,12 +308,14 @@ const borrowController = {
         : null;
 
     res.json(
-      await borrowModel.markReturned(
-        borrow.id,
-        {
-          actor: req.user,
-          note
-        }
+      await transition(
+        borrowModel.markReturned(
+          borrow.id,
+          {
+            actor: req.user,
+            note
+          }
+        )
       )
     );
   }

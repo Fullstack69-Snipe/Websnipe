@@ -1,5 +1,6 @@
-import { createContext, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api } from './api'
+import { AuthContext } from './useAuth'
 import type { Role, User } from '../types'
 
 export type AuthUser = User & { avatarUrl?: string | null }
@@ -11,8 +12,6 @@ export type AuthState = {
   signOut: () => Promise<void>
   refresh: () => Promise<void>
 }
-
-export const AuthContext = createContext<AuthState | null>(null)
 
 // ถาม /api/me ตอนเปิดแอป — ได้ผู้ใช้ = มี session อยู่, 401 = ยังไม่ได้เข้าสู่ระบบ
 export function AuthProvider({ children }: { children: ReactNode }) {

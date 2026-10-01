@@ -35,6 +35,7 @@ export const logActionEnum = pgEnum("log_action", [
   "borrow_rejected",
   "borrow_return_requested",
   "borrow_returned",
+  "borrow_cancelled",
 ]);
 
 export const borrowStatusEnum = pgEnum("borrow_status", [
@@ -43,6 +44,8 @@ export const borrowStatusEnum = pgEnum("borrow_status", [
   "rejected",
   "returning",
   "returned",
+  // ผู้ยืมยกเลิกเองขณะที่ยังรออนุมัติ
+  "cancelled",
 ]);
 
 // ตรงกับ Role / BorrowStatus ฝั่ง frontend แบบ 1:1
