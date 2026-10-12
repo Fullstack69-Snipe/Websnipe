@@ -1,4 +1,3 @@
-
 const express = require('express');
 
 const ctrl = require(
@@ -65,6 +64,9 @@ router.put(
   requireRole('staff', 'admin'),
   wrap(ctrl.reject)
 );
+
+// เจ้าหน้าที่ยืนยันการส่งมอบอุปกรณ์จริง
+router.put('/:id/pickup', requireRole('staff', 'admin'), wrap(ctrl.pickup));
 
 // ยืนยันการคืนอุปกรณ์
 router.put(

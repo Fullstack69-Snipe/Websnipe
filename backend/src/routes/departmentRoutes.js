@@ -1,0 +1,11 @@
+const express=require('express');
+const ctrl=require('../controllers/departmentController');
+const {requireRole}=require('../middleware/identity');
+const wrap=require('../utils/wrap');
+const router=express.Router();
+router.get('/',wrap(ctrl.list));
+router.get('/:id/equipment',wrap(ctrl.equipment));
+router.post('/',requireRole('admin'),wrap(ctrl.create));
+router.put('/:id/equipment/:equipmentId',requireRole('admin'),wrap(ctrl.assignEquipment));
+router.put('/:id/staff/:userId',requireRole('admin'),wrap(ctrl.assignStaff));
+module.exports=router;

@@ -1,0 +1,1 @@
+const express=require('express'); const ctrl=require('../controllers/qrController'); const wrap=require('../utils/wrap'); const router=express.Router(); router.post('/resolve',wrap(ctrl.resolve)); router.get('/equipment/:id',wrap(ctrl.get)); module.exports=router;

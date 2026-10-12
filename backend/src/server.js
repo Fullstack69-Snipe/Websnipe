@@ -14,6 +14,8 @@ const { UPLOAD_DIR } = require('./middleware/upload');
 const equipmentRoutes = require('./routes/equipmentRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const borrowRoutes = require('./routes/borrowRoutes');
+const departmentRoutes = require('./routes/departmentRoutes');
+const qrRoutes = require('./routes/qrRoutes');
 const userRoutes = require('./routes/userRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const authRoutes = require('./routes/authRoutes');
@@ -63,6 +65,8 @@ app.get('/api/me', wrap(userController.me));
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/borrows', borrowRoutes);
+app.use('/api/departments', departmentRoutes);
+app.use('/api/qr', qrRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/uploads', uploadRoutes);
 

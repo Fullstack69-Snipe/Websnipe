@@ -1,3 +1,4 @@
+const store = require('../services/featureStore');
 // src/controllers/equipmentController.js
 // ตรงกับ mockApi: listEquipment / createEquipment / updateEquipment / deleteEquipment
 
@@ -61,6 +62,7 @@ const equipmentController = {
     const { id } = req.params;
     if (!await equipmentModel.findById(id)) throw notFound('ไม่พบอุปกรณ์');
 
+    await store.assertStaffAccess(req.user, id);
     const input = parseInput(req.body);
 
     // กันลดจำนวนต่ำกว่าที่ถูกยืมอยู่ (ข้อความเดียวกับ mockApi)
@@ -77,6 +79,7 @@ const equipmentController = {
     const { id } = req.params;
     if (!await equipmentModel.findById(id)) throw notFound('ไม่พบอุปกรณ์');
 
+    await store.assertStaffAccess(req.user, id);
     res.json(await logModel.listByEquipment(id));
   },
 
@@ -85,6 +88,7 @@ const equipmentController = {
     const { id } = req.params;
     if (!await equipmentModel.findById(id)) throw notFound('ไม่พบอุปกรณ์');
 
+    await store.assertStaffAccess(req.user, id);
     if (await equipmentModel.borrowedCount(id) > 0) {
       throw conflict('อุปกรณ์กำลังถูกยืมอยู่ ลบไม่ได้');
     }

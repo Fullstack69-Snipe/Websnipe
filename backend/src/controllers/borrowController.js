@@ -1,4 +1,4 @@
-
+const store = require('../services/featureStore');
 const { BorrowConflictError } = require('db');
 const borrowModel = require('../models/borrowModel');
 const equipmentModel = require('../models/equipmentModel');
@@ -49,7 +49,14 @@ const borrowController = {
 
   // POST /api/borrows
   async create(req, res) {
-    const { equipmentId, dueDate } = req.body;
+    const { equipmentId } = req.body;
+    const startAt = req.body.startAt === undefined ? new Date().toISOString() : req.body.startAt;
+    const endAt = req.body.endAt;
+    if (typeof startAt !== 'string' || !Number.isFinite(Date.parse(startAt)) || !/(Z|[+-]\d{2}:\d{2})$/.test(startAt)) throw badRequest('startAt ต้องเป็น ISO datetime พร้อม timezone');
+    if (endAt !== undefined && (typeof endAt !== 'string' || !Number.isFinite(Date.parse(endAt)) || !/(Z|[+-]\d{2}:\d{2})$/.test(endAt))) throw badRequest('endAt ต้องเป็น ISO datetime พร้อม timezone');
+    const dueDate = req.body.dueDate ?? (endAt ? new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Bangkok'}).format(new Date(endAt)) : undefined);
+    const endIso = endAt ?? `${dueDate}T23:59:59+07:00`;
+    if (Number.isFinite(Date.parse(endIso)) && Date.parse(endIso) <= Date.parse(startAt)) throw badRequest('วันสิ้นสุดต้องอยู่หลังวันเริ่มต้น');
 
     if (!equipmentId) {
       throw badRequest('กรุณาระบุอุปกรณ์');
@@ -77,6 +84,7 @@ const borrowController = {
       );
     }
 
+    await store.init();
     const borrow = await borrowModel.create(
       {
         equipmentId,
@@ -90,7 +98,14 @@ const borrowController = {
       req.user
     );
 
-    res.status(201).json(borrow);
+    try {
+      await store.sql`INSERT INTO ws_borrow_details(borrow_id,start_at,end_at) VALUES(${borrow.id},${startAt},${endIso})`;
+    } catch (err) {
+      // Never leave an untracked pending request after metadata write failure.
+      await borrowModel.setStatus(borrow.id, 'cancelled', {actor:req.user,from:['pending']}).catch(() => {});
+      throw err;
+    }
+    res.status(201).json(await store.decorate(borrow));
   },
 
   // GET /api/borrows/mine
@@ -99,7 +114,7 @@ const borrowController = {
       req.user.id
     );
 
-    res.json(borrows);
+    res.json(await Promise.all(borrows.map(store.decorate)));
   },
 
   // =========================================
@@ -201,7 +216,7 @@ const borrowController = {
 
   // GET /api/borrows
   async list(req, res) {
-    res.json(await borrowModel.listAll());
+    res.json(await Promise.all((await borrowModel.listAll()).map(store.decorate)));
   },
 
   // PUT /api/borrows/:id/approve
@@ -225,10 +240,12 @@ const borrowController = {
       borrow.equipmentId
     );
 
+    await store.assertStaffAccess(req.user, borrow.equipmentId);
+    const d = await store.detail(borrow.id);
+    if (d && new Date(d.endAt) <= new Date()) throw conflict('ช่วงเวลาจองสิ้นสุดแล้ว');
+    if (d && await store.overlap(borrow.equipmentId, d.startAt, d.endAt) >= item.quantity) throw conflict('อุปกรณ์ถูกจองเต็มในช่วงเวลานี้');
     if (item.available <= 0) {
-      throw conflict(
-        'อุปกรณ์หมดแล้ว ถูกอนุมัติให้คนอื่นไปก่อน'
-      );
+      throw conflict('อุปกรณ์หมดแล้ว ถูกอนุมัติให้คนอื่นไปก่อน');
     }
 
     res.json(
@@ -262,6 +279,8 @@ const borrowController = {
       );
     }
 
+    await store.assertStaffAccess(req.user, borrow.equipmentId);
+
     const reason =
       typeof req.body.reason === 'string'
         ? req.body.reason.trim() || null
@@ -280,6 +299,20 @@ const borrowController = {
         )
       )
     );
+  },
+
+  // PUT /api/borrows/:id/pickup
+  async pickup(req, res) {
+    const borrow = await borrowModel.findById(req.params.id);
+    if (!borrow) throw notFound('ไม่พบรายการยืม');
+    if (borrow.status !== 'approved') throw conflict('ต้องอนุมัติรายการก่อนส่งมอบ');
+    await store.assertStaffAccess(req.user, borrow.equipmentId);
+    await store.init();
+    // Atomic one-time confirmation; repeated pickup returns HTTP 409.
+    const updated = await store.sql`UPDATE ws_borrow_details SET picked_up_at=now(), picked_up_by=${req.user.id}
+      WHERE borrow_id=${borrow.id} AND picked_up_at IS NULL RETURNING picked_up_at`;
+    if (!updated.length) throw conflict('รายการนี้รับอุปกรณ์แล้ว หรือไม่มีข้อมูลช่วงเวลายืม');
+    res.json(await store.decorate(borrow));
   },
 
   // PUT /api/borrows/:id/confirm-return
@@ -301,6 +334,8 @@ const borrowController = {
         'รายการนี้ไม่ได้อยู่ระหว่างการยืม'
       );
     }
+
+    await store.assertStaffAccess(req.user, borrow.equipmentId);
 
     const note =
       typeof req.body.note === 'string'
