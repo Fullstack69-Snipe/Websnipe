@@ -449,3 +449,25 @@ button.danger:is(:hover, :focus) {
   --pico-background-color: #a5311f;
   --pico-border-color: #a5311f;
 }
+
+/* ===== ช่วงเวลายืม (dialog ขอยืม) ===== */
+.date-range {
+  display: grid;
+  gap: 1rem;
+}
+@media (min-width: 30rem) {
+  .date-range {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.date-range label {
+  margin-block-end: 0;
+}
+.range-summary {
+  margin-block: 0.5rem 1rem;
+  font-size: 0.9rem;
+  color: var(--pico-muted-color);
+}
+.range-summary strong {
+  color: var(--pico-color);
+}

@@ -21,6 +21,8 @@ export default function EquipmentList() {
 
   // อุปกรณ์ที่กำลังจะยืม (null = ไม่ได้เปิด dialog)
   const [target, setTarget] = useState<Equipment | null>(null)
+  // ช่วงเวลายืม — เก็บเป็น 'YYYY-MM-DD' ให้ <input type="date"> ใช้ได้ตรง ๆ
+  const [startDate, setStartDate] = useState(dayjs().format('YYYY-MM-DD'))
   const [dueDate, setDueDate] = useState(dayjs().add(7, 'day').format('YYYY-MM-DD'))
   const [submitting, setSubmitting] = useState(false)
   // เหตุผลที่ขอยืม — ไม่บังคับ แต่ช่วยให้เจ้าหน้าที่ตัดสินใจง่ายขึ้น
@@ -51,9 +53,19 @@ export default function EquipmentList() {
 
   async function handleBorrow() {
     if (!target) return
+    if (!dayjs(dueDate).isAfter(dayjs(startDate), 'day')) {
+      return toast('วันสิ้นสุดต้องอยู่หลังวันเริ่มต้น', 'error')
+    }
+
     setSubmitting(true)
     try {
-      await api.requestBorrow(target.id, dueDate, purpose.trim() || undefined)
+      // backend ต้องการ ISO พร้อม timezone — ยืมทั้งวันตั้งแต่ 00:00 ถึง 23:59
+      await api.requestBorrow(
+        target.id,
+        dayjs(startDate).startOf('day').format(),
+        dayjs(dueDate).endOf('day').format(),
+        purpose.trim() || undefined,
+      )
       setTarget(null)
       setPurpose('')
       toast('ส่งคำขอยืมเรียบร้อย รอเจ้าหน้าที่อนุมัติ')
@@ -118,15 +130,37 @@ export default function EquipmentList() {
           <header>
             <strong>ขอยืม: {target?.name}</strong>
           </header>
-          <label>
-            วันที่ครบกำหนดคืน
-            <input
-              type="date"
-              value={dueDate}
-              min={dayjs().format('YYYY-MM-DD')}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
-          </label>
+          <div className="date-range">
+            <label>
+              วันที่เริ่มยืม
+              <input
+                type="date"
+                value={startDate}
+                min={dayjs().format('YYYY-MM-DD')}
+                onChange={(e) => {
+                  setStartDate(e.target.value)
+                  // ถ้าวันเริ่มเลยวันคืนไปแล้ว ดันวันคืนตามให้อัตโนมัติ
+                  if (!dayjs(dueDate).isAfter(dayjs(e.target.value), 'day')) {
+                    setDueDate(dayjs(e.target.value).add(7, 'day').format('YYYY-MM-DD'))
+                  }
+                }}
+              />
+            </label>
+            <label>
+              วันที่ครบกำหนดคืน
+              <input
+                type="date"
+                value={dueDate}
+                min={dayjs(startDate).add(1, 'day').format('YYYY-MM-DD')}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </label>
+          </div>
+
+          <p className="range-summary">
+            ยืมทั้งหมด <strong>{dayjs(dueDate).diff(dayjs(startDate), 'day')}</strong> วัน
+          </p>
+
           <label>
             เหตุผลที่ขอยืม (ไม่บังคับ)
             <textarea

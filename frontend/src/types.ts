@@ -61,6 +61,8 @@ export type Borrow = {
   returnNote: string | null
   createdAt: string
   returnedAt: string | null
+   // ช่วงเวลายืม + การรับของ — null ถ้าเป็นรายการเก่าก่อนมีฟีเจอร์นี้
+  details: BorrowDetails | null
 }
 
 export type LogAction =
@@ -73,6 +75,7 @@ export type LogAction =
   | 'borrow_return_requested'
   | 'borrow_returned'
   | 'borrow_cancelled'
+  | 'borrow_picked_up'
 
 export type EquipmentLog = {
   id: number
@@ -85,5 +88,19 @@ export type EquipmentLog = {
   fromStatus: BorrowStatus | null
   toStatus: BorrowStatus | null
   note: string | null
+  createdAt: string
+}
+
+export type BorrowDetails = {
+  borrowId: string
+  startAt: string           // ISO datetime พร้อม timezone เช่น 2026-10-16T09:00:00+07:00
+  endAt: string
+  pickedUpAt: string | null // null = อนุมัติแล้วแต่ยังไม่มารับของ
+  pickedUpBy: string | null
+}
+
+export type Department = {
+  id: number
+  name: string
   createdAt: string
 }
