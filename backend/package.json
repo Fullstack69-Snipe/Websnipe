@@ -14,9 +14,7 @@
     "cors": "^2.8.5",
     "db": "file:../db",
     "express": "^4.19.2",
-    "multer": "^2.0.0"
-  },
-  "devDependencies": {
-    "@tsconfig/node-lts": "^24.0.1"
+    "multer": "^2.0.0",
+    "qrcode": "^1.5.4"
   }
 }

@@ -1,53 +1,104 @@
-const store = require("../services/featureStore");
-const { badRequest, notFound, conflict } = require("../utils/HttpError");
-const { equipmentModel } = require("db");
-const positive = (v) => Number.isSafeInteger(Number(v)) && Number(v) > 0;
+// src/controllers/departmentController.js
+// แผนก — ทุกคนดูรายการได้ สร้าง/มอบหมายได้เฉพาะ admin
+
+const { departmentModel, equipmentModel, userModel } = require('db');
+const { badRequest, notFound, conflict } = require('../utils/HttpError');
+
+function parseId(value) {
+  const id = Number(value);
+  if (!Number.isSafeInteger(id) || id <= 0) throw badRequest('รหัสแผนกไม่ถูกต้อง');
+  return id;
+}
+
+// drizzle ห่อ error ของ postgres ไว้ชั้นหนึ่ง โค้ดจริงอยู่ที่ err.cause (เหมือน categoryController)
+function asConflict(err) {
+  return (err?.code ?? err?.cause?.code) === '23505' ? conflict('ชื่อแผนกซ้ำ') : err;
+}
+
+function parseName(body) {
+  const name = typeof body?.name === 'string' ? body.name.trim() : '';
+  if (!name || name.length > 120) throw badRequest('ชื่อแผนกต้องมี 1–120 ตัวอักษร');
+  return name;
+}
+
+async function findDepartment(value) {
+  const department = await departmentModel.findById(parseId(value));
+  if (!department) throw notFound('ไม่พบแผนก');
+  return department;
+}
+
 module.exports = {
+  // GET /api/departments
+  // รายชื่อ/อีเมลเจ้าหน้าที่ให้เห็นเฉพาะ admin — ผู้ยืมใช้แค่ชื่อแผนกไปเลือกดูของ
   async list(req, res) {
-    await store.init();
+    const departments = await departmentModel.listAll();
     res.json(
-      await store.sql`SELECT id,name,created_at AS "createdAt" FROM ws_departments ORDER BY name`,
+      req.role === 'admin'
+        ? departments
+        : departments.map((d) => ({ ...d, staff: [] }))
     );
   },
+
+  // POST /api/departments
   async create(req, res) {
-    const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
-    if (!name || name.length > 120)
-      throw badRequest("ชื่อแผนกต้องมี 1–120 ตัวอักษร");
-    await store.init();
-    const rows =
-      await store.sql`INSERT INTO ws_departments(name) VALUES(${name}) ON CONFLICT(name) DO NOTHING RETURNING id,name`;
-    if (!rows.length) throw conflict("ชื่อแผนกซ้ำ");
-    res.status(201).json(rows[0]);
+    const department = await departmentModel.create(parseName(req.body));
+    if (!department) throw conflict('ชื่อแผนกซ้ำ');
+    res.status(201).json(department);
   },
-  async assignEquipment(req, res) {
-    const { id, equipmentId } = req.params;
-    if (!positive(id)) throw badRequest("รหัสแผนกไม่ถูกต้อง");
-    if (!(await equipmentModel.findById(equipmentId)))
-      throw notFound("ไม่พบอุปกรณ์");
-    await store.init();
-    const d = await store.sql`SELECT id FROM ws_departments WHERE id=${id}`;
-    if (!d.length) throw notFound("ไม่พบแผนก");
-    await store.sql`INSERT INTO ws_equipment_departments(equipment_id,department_id) VALUES(${equipmentId},${id}) ON CONFLICT(equipment_id) DO UPDATE SET department_id=excluded.department_id`;
-    res.json({ equipmentId, departmentId: Number(id) });
-  },
-  async assignStaff(req, res) {
-    const { id, userId } = req.params;
-    if (!positive(id)) throw badRequest("รหัสแผนกไม่ถูกต้อง");
-    await store.init();
-    const rows =
-      await store.sql`INSERT INTO ws_staff_departments(user_id,department_id) SELECT ${userId},id FROM ws_departments WHERE id=${id} ON CONFLICT DO NOTHING RETURNING user_id`;
-    if (!rows.length) {
-      const dep = await store.sql`SELECT id FROM ws_departments WHERE id=${id}`;
-      if (!dep.length) throw notFound("ไม่พบแผนก");
-      const user = await store.sql`SELECT id FROM users WHERE id=${userId}`;
-      if (!user.length) throw notFound("ไม่พบผู้ใช้");
+
+  // PUT /api/departments/:id — แก้ชื่อ
+  async rename(req, res) {
+    const department = await findDepartment(req.params.id);
+    try {
+      res.json(await departmentModel.rename(department.id, parseName(req.body)));
+    } catch (err) {
+      throw asConflict(err);
     }
-    res.json({ userId, departmentId: Number(id) });
   },
+
+  // DELETE /api/departments/:id — อุปกรณ์ในแผนกกลายเป็นไม่สังกัดแผนก (ไม่ถูกลบ)
+  async remove(req, res) {
+    const department = await findDepartment(req.params.id);
+    res.json({ ok: true, unassigned: await departmentModel.remove(department.id) });
+  },
+
+  // GET /api/departments/:id/equipment — หน้าตาเดียวกับ GET /api/equipment
   async equipment(req, res) {
-    await store.init();
-    res.json(
-      await store.sql`SELECT e.* FROM equipment e JOIN ws_equipment_departments m ON m.equipment_id=e.id WHERE m.department_id=${req.params.id} ORDER BY e.name`,
-    );
+    const department = await findDepartment(req.params.id);
+    res.json(await equipmentModel.listAll({ departmentId: department.id }));
+  },
+
+  // PUT /api/departments/:id/equipment/:equipmentId
+  async assignEquipment(req, res) {
+    const department = await findDepartment(req.params.id);
+    const { equipmentId } = req.params;
+    if (!await equipmentModel.findById(equipmentId)) throw notFound('ไม่พบอุปกรณ์');
+
+    await departmentModel.assignEquipment(department.id, equipmentId);
+    res.json({ equipmentId, departmentId: department.id });
+  },
+
+  // PUT /api/departments/:id/staff/:userId
+  async assignStaff(req, res) {
+    const department = await findDepartment(req.params.id);
+    const { userId } = req.params;
+    if (!await userModel.findById(userId)) throw notFound('ไม่พบผู้ใช้');
+
+    await departmentModel.assignStaff(department.id, userId);
+    res.json({ userId, departmentId: department.id });
+  },
+
+  // DELETE /api/departments/:id/staff/:userId
+  async removeStaff(req, res) {
+    const department = await findDepartment(req.params.id);
+    await departmentModel.removeStaff(department.id, req.params.userId);
+    res.status(204).end();
+  },
+
+  // DELETE /api/departments/:id/equipment/:equipmentId — กลับเป็นไม่สังกัดแผนก
+  async unassignEquipment(req, res) {
+    const department = await findDepartment(req.params.id);
+    await departmentModel.unassignEquipment(department.id, req.params.equipmentId);
+    res.status(204).end();
   },
 };

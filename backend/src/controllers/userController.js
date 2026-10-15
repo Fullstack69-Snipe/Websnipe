@@ -2,6 +2,7 @@
 // ตรงกับ mockApi: listUsers / updateUserRole  (+ /me สำหรับหาตัวตนปัจจุบัน)
 
 const userModel = require('../models/userModel');
+const { departmentModel } = require('db');
 const { badRequest, notFound } = require('../utils/HttpError');
 
 const VALID_ROLES = ['user', 'staff', 'admin'];
@@ -14,8 +15,13 @@ const userController = {
 
   // GET /api/me — แทน CURRENT_USER_ID ฝั่ง frontend
   // ส่ง role ที่ใช้ตรวจสิทธิ์จริงกลับไปด้วย (เผื่อถูก override ด้วย header x-role)
+  // departmentIds ให้หน้าจอซ่อนปุ่มจัดการอุปกรณ์ที่อยู่นอกแผนกของ staff
   async me(req, res) {
-    res.json({ ...req.user, activeRole: req.role });
+    res.json({
+      ...req.user,
+      activeRole: req.role,
+      departmentIds: await departmentModel.departmentIdsOf(req.user.id)
+    });
   },
 
   // PUT /api/users/:id/role   body: { role }

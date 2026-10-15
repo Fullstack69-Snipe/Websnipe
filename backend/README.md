@@ -38,8 +38,8 @@ POSTGRES_HOST=localhost pnpm dev
 BASE=http://localhost:6002/api node db/smoke-test.js
 ```
 
-50 เคส ครอบคลุมทุก endpoint, ทุกสิทธิ์, ข้อความ error, วงจรการยืมทั้งวงจร
-และกรณีกดพร้อมกัน (อนุมัติชิ้นสุดท้ายซ้อนกัน, ยกเลิกจังหวะเดียวกับอนุมัติ)
+104 เคส ครอบคลุมทุก endpoint, ทุกสิทธิ์, ข้อความ error, วงจรการยืมทั้งวงจร, ช่วงเวลายืม,
+การรับของ, สิทธิ์ตามแผนก, QR, การกลับหน้าเดิมหลัง login และกรณีกดพร้อมกัน (อนุมัติชิ้นสุดท้ายซ้อนกัน, ยกเลิกจังหวะเดียวกับอนุมัติ)
 สคริปต์สร้าง session ใส่ฐานข้อมูลโดยตรงเพื่อใช้ทดสอบ แล้วลบทิ้งเมื่อจบ
 (ไม่มีช่องทางลัดใดๆ ในตัว backend)
 
@@ -55,7 +55,7 @@ BASE=http://localhost:6002/api node db/smoke-test.js
 | --- | --- |
 | `GET /health` | ใช้กับ healthcheck ของ docker |
 | `GET /auth/providers` | ช่องทาง login ที่เปิดใช้อยู่ |
-| `GET /auth/:provider` | เด้งไปหน้า login ของผู้ให้บริการ |
+| `GET /auth/:provider?next=/path` | เด้งไปหน้า login ของผู้ให้บริการ แล้วกลับมาที่ `next` (รับเฉพาะ path ในแอป) |
 | `GET /auth/:provider/callback` | ผู้ให้บริการเรียกกลับมาที่นี่ |
 
 ### ต้องเข้าสู่ระบบ
@@ -63,8 +63,9 @@ BASE=http://localhost:6002/api node db/smoke-test.js
 | HTTP | สิทธิ์ |
 | --- | --- |
 | `POST /auth/logout` | ทุกคน |
-| `GET /me` | ทุกคน |
+| `GET /me` | ทุกคน (มี `departmentIds` = แผนกที่ดูแล) |
 | `GET /equipment` · `GET /equipment/:id` | ทุกคน |
+| `GET /equipment/:id/bookings` | ทุกคน — ช่วงที่ถูกจองแล้ว (ไม่มีชื่อผู้ยืม) ให้หน้าขอยืมเลือกวันได้ถูก |
 | `POST /equipment` · `PUT /equipment/:id` · `DELETE /equipment/:id` | staff, admin |
 | `POST /uploads` | staff, admin |
 | `GET /equipment/:id/logs` | staff, admin |
@@ -75,7 +76,11 @@ BASE=http://localhost:6002/api node db/smoke-test.js
 | `PUT /borrows/:id/cancel` | เจ้าของรายการเท่านั้น (เฉพาะสถานะ `pending`) |
 | `PUT /borrows/:id/request-return` | เจ้าของรายการ (staff/admin ทำแทนได้) |
 | `GET /borrows` | staff, admin |
-| `PUT /borrows/:id/approve` · `/reject` · `/confirm-return` | staff, admin |
+| `PUT /borrows/:id/approve` · `/reject` · `/confirm-return` | staff ในแผนก, admin |
+| `PUT /borrows/:id/pickup` | เจ้าของรายการ หรือ staff ในแผนก, admin |
+| `GET /departments` · `GET /departments/:id/equipment` | ทุกคน |
+| `POST /departments` · `PUT` / `DELETE /departments/:id` (แก้ชื่อ / ลบ) · `PUT` / `DELETE /departments/:id/equipment/:equipmentId` · `PUT` / `DELETE /departments/:id/staff/:userId` | admin |
+| `GET /qr/equipment/:id.svg` | ทุกคน — รูป QR ที่ลิงก์ไปหน้า `/equipment/:id` |
 | `GET /users` · `PUT /users/:id/role` | admin |
 
 ### อัปโหลดรูป
@@ -114,7 +119,7 @@ OAuth 2.0 authorization-code flow เขียนเองตรงๆ ไม่
 ที่ผู้ให้บริการยืนยันแล้ว → ยังไม่เจอจึงสร้างใหม่
 คนเดียวผูกได้ทั้ง Google, GitHub และ Discord ถ้าอีเมลเดียวกัน
 
-> ผู้ใช้จาก seed (`u1`–`u4`) เป็นข้อมูลตัวอย่างเท่านั้น ไม่ได้ผูกกับบัญชี OAuth ใด
+> ผู้ใช้จาก seed (`u1`–`u5`) เป็นข้อมูลตัวอย่างเท่านั้น ไม่ได้ผูกกับบัญชี OAuth ใด
 > จึง login เข้าบัญชีเหล่านั้นไม่ได้
 
 ---
@@ -161,6 +166,15 @@ cors -> json -> cookieParser -> /uploads (static) -> /api/health
 - แจ้งคืนได้เฉพาะรายการของตัวเอง ยกเว้น staff/admin ทำแทนได้
 - ยกเลิกคำขอได้เฉพาะเจ้าของ และเฉพาะตอนที่ยัง `pending` — อนุมัติแล้วต้องใช้การแจ้งคืนแทน
 - วันครบกำหนดต้องไม่ก่อน "วันนี้" ตามเวลาไทย (Asia/Bangkok) ไม่ใช่ UTC
+- ขอยืมได้สองแบบ: ส่ง `startAt` / `endAt` (ISO พร้อม timezone) หรือส่ง `dueDate` อย่างเดียว
+  (= เริ่มตอนนี้ ถึงสิ้นวัน `dueDate`) ของพอไหมดูจากรายการที่อนุมัติแล้วและจองทับช่วงเดียวกัน
+  ของหมดตอนนี้ก็ยังจองช่วงอื่นได้ — `available` ของอุปกรณ์คือจำนวนที่อยู่บนชั้นตอนนี้
+- รายการเก่าที่ไม่มีช่วงเวลา และของที่เลยกำหนดแล้วยังไม่คืน ถือว่าจองไว้จนกว่าจะคืน
+- รับของ (`pickup`) กดได้ครั้งเดียว เฉพาะรายการที่อนุมัติแล้วและมีช่วงเวลายืม
+- staff จัดการได้เฉพาะอุปกรณ์ในแผนกที่ตัวเองดูแล และอุปกรณ์ที่ไม่สังกัดแผนก
+- ตั้งแผนกของอุปกรณ์ (`departmentId` ตอนเพิ่ม/แก้อุปกรณ์) ได้เฉพาะ admin — staff ส่งมาก็ไม่มีผล
+  ไม่ส่ง `departmentId` เลย = แผนกเดิมไม่เปลี่ยน / ลบแผนกแล้วอุปกรณ์กลายเป็นไม่สังกัดแผนก (ไม่ถูกลบ)
+  `GET /borrows` ของ staff จึงเห็นเฉพาะคำขอของอุปกรณ์กลุ่มนั้น admin เห็นทั้งหมด
 - การเปลี่ยนสถานะล็อกแถวแล้วตรวจซ้ำในทรานแซกชัน ถ้ามีคนเปลี่ยนไปก่อน
   (เช่น สองคนอนุมัติชิ้นสุดท้ายพร้อมกัน) คนที่มาทีหลังได้ 409
 - "เกินกำหนด" ไม่ใช่สถานะในฐานข้อมูล แต่คำนวณจาก `approved` + `dueDate < วันนี้`

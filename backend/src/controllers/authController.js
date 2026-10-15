@@ -4,7 +4,7 @@
 // ลำดับ:
 //   1) GET /api/auth/:provider           -> redirect ไปหน้า login ของ provider พร้อม state
 //   2) provider เด้งกลับมาที่ /callback  -> ตรวจ state, แลก code เป็น access token
-//   3) เอา token ไปดึงโปรไฟล์ -> หา/สร้างผู้ใช้ -> สร้าง session -> ตั้งคุกกี้ -> เด้งเข้าหน้าแรก
+//   3) เอา token ไปดึงโปรไฟล์ -> หา/สร้างผู้ใช้ -> สร้าง session -> ตั้งคุกกี้ -> เด้งกลับหน้าที่ตั้งใจเปิด
 
 const crypto = require('crypto');
 const { authModel } = require('db');
@@ -13,6 +13,7 @@ const { badRequest, unauthorized } = require('../utils/HttpError');
 
 const SESSION_COOKIE = 'pf_session';
 const STATE_COOKIE = 'pf_oauth_state';
+const NEXT_COOKIE = 'pf_oauth_next';
 const IS_PROD = process.env.NODE_ENV === 'production';
 
 // คุกกี้ session: httpOnly กัน JS อ่าน, sameSite=lax ให้รอดตอน provider redirect กลับมา
@@ -24,6 +25,11 @@ const sessionCookieOptions = (expiresAt) => ({
   path: '/',
   expires: expiresAt,
 });
+
+// หน้าที่จะพากลับไปหลัง login (เช่น สแกน QR ตอนยังไม่ได้ login)
+// รับเฉพาะ path ในแอปนี้ ไม่งั้นจะกลายเป็นทางให้คนอื่นใช้เด้งผู้ใช้ไปเว็บปลอม (open redirect)
+const safeNext = (value) =>
+  typeof value === 'string' && /^\/(?![/\\])\S*$/.test(value) ? value : '/';
 
 const authController = {
   // GET /api/auth/providers — ให้หน้า sign-in รู้ว่ามีปุ่มอะไรให้กดบ้าง
@@ -41,13 +47,15 @@ const authController = {
     // state กัน CSRF: สุ่มค่า เก็บไว้ในคุกกี้ แล้วเทียบตอน callback
     const state = crypto.randomBytes(16).toString('base64url');
 
-    res.cookie(STATE_COOKIE, state, {
+    const tempCookie = {
       httpOnly: true,
       sameSite: 'lax',
       secure: IS_PROD && APP_URL.startsWith('https://'),
       path: '/',
       maxAge: 10 * 60 * 1000, // 10 นาที พอสำหรับการกดล็อกอิน
-    });
+    };
+    res.cookie(STATE_COOKIE, state, tempCookie);
+    res.cookie(NEXT_COOKIE, safeNext(req.query.next), tempCookie);
 
     const params = new URLSearchParams({
       client_id: provider.clientId,
@@ -85,7 +93,8 @@ const authController = {
     const { token, expiresAt } = await authModel.createSession(user.id);
 
     res.cookie(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
-    res.redirect('/');
+    res.clearCookie(NEXT_COOKIE, { path: '/' });
+    res.redirect(safeNext(req.cookies?.[NEXT_COOKIE]));
   },
 
   // POST /api/auth/logout
@@ -209,4 +218,5 @@ async function githubProfile(raw, headers) {
 }
 
 module.exports = authController;
+module.exports.safeNext = safeNext;
 module.exports.SESSION_COOKIE = SESSION_COOKIE;

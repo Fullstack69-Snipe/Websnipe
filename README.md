@@ -19,6 +19,10 @@ docker compose up -d --build
 ตอนบูตครั้งแรก backend จะรัน migration และใส่ข้อมูลตัวอย่างให้เอง
 รันซ้ำได้ ถ้ามีข้อมูลอยู่แล้วจะข้ามการ seed
 
+ข้อมูลตัวอย่างมี 2 แผนก อุปกรณ์ 6 ชิ้นพร้อมรูปจริง และคำขอยืมครบทุกสถานะ
+(รูปมาจาก Wikimedia Commons — เครดิตอยู่ที่ [`frontend/public/seed/CREDITS.md`](frontend/public/seed/CREDITS.md))
+อยากล้างแล้วใส่ใหม่: `docker compose exec backend sh -c "cd /app/db && node dist/db/seed.js --reset"`
+
 > ยังเข้าสู่ระบบไม่ได้จนกว่าจะตั้งค่า OAuth อย่างน้อยหนึ่งช่องทาง
 
 ---
@@ -91,7 +95,7 @@ docker compose down              # ปิด (ข้อมูลยังอย�
 docker compose down -v           # ปิดและลบข้อมูลทั้งหมด
 ```
 
-ทดสอบ API ทั้ง 50 เคส (ต้องรันระบบอยู่):
+ทดสอบ API ทั้ง 104 เคส (ต้องรันระบบอยู่):
 
 ```bash
 cd backend && BASE=http://localhost:6002/api node db/smoke-test.js

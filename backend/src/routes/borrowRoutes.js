@@ -65,8 +65,11 @@ router.put(
   wrap(ctrl.reject)
 );
 
-// เจ้าหน้าที่ยืนยันการส่งมอบอุปกรณ์จริง
-router.put('/:id/pickup', requireRole('staff', 'admin'), wrap(ctrl.pickup));
+// ยืนยันรับของ — ผู้ยืมกดเอง หรือ staff/admin กดตอนส่งมอบ (controller ตรวจสิทธิ์)
+router.put(
+  '/:id/pickup',
+  wrap(ctrl.pickup)
+);
 
 // ยืนยันการคืนอุปกรณ์
 router.put(

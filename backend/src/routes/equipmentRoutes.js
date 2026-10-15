@@ -9,6 +9,7 @@ const router = express.Router();
 // อ่านได้ทุก role
 router.get('/', wrap(ctrl.list));
 router.get('/:id', wrap(ctrl.getOne));
+router.get('/:id/bookings', wrap(ctrl.bookings));
 
 // ประวัติ — staff + admin เท่านั้น
 router.get('/:id/logs', requireRole('staff', 'admin'), wrap(ctrl.logs));

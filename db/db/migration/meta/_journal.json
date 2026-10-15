@@ -43,6 +43,13 @@
       "when": 1790871327728,
       "tag": "0005_lumpy_northstar",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792076677084,
+      "tag": "0006_tense_pride",
+      "breakpoints": true
     }
   ]
 }

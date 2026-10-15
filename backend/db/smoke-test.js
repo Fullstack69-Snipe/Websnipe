@@ -16,7 +16,7 @@ const BASE = process.env.BASE || 'http://localhost:3000/api';
 // ตอนนี้ระบบใช้ session cookie ไม่มี header x-user-id / x-role แล้ว
 // เทสต์จึงสร้าง session ตรงเข้าฐานข้อมูลแทนการเดินผ่าน OAuth จริง
 // (ไม่ได้เปิดช่องทางลัดใดๆ ใน backend — แค่ใช้สิทธิ์เข้าถึง DB ที่เทสต์มีอยู่แล้ว)
-const SESSION_FOR = { user: 'u1', staff: 'u2', admin: 'u3' };
+const SESSION_FOR = { user: 'u1', staff: 'u2', admin: 'u3', user2: 'u4' };
 const cookies = {};
 
 async function createSessions() {
@@ -48,6 +48,8 @@ async function call(method, path, { body, as = 'user' } = {}) {
 }
 
 const STAFF = { as: 'staff' };
+const EQUIPMENT_KEYS =
+  'available,categoryId,categoryName,departmentId,departmentName,description,id,imageUrl,name,quantity';
 
 (async () => {
   await createSessions();
@@ -56,7 +58,7 @@ const STAFF = { as: 'staff' };
     const { body: list } = await call('GET', '/equipment');
     check('listEquipment คืน array', Array.isArray(list));
     const keys = Object.keys(list[0]).sort().join(',');
-    check('field ครบและชื่อตรง', keys === 'available,categoryId,categoryName,description,id,imageUrl,name,quantity', `got: ${keys}`);
+    check('field ครบและชื่อตรง', keys === EQUIPMENT_KEYS, `got: ${keys}`);
     check('id เป็น string', typeof list[0].id === 'string');
     const e5 = list.find((e) => e.id === 'e5');
     check('e5 available = 0 (ถูกยืมอยู่)', e5.available === 0, `got ${e5.available}`);
@@ -66,8 +68,7 @@ const STAFF = { as: 'staff' };
     check('e2 available สมเหตุสมผลกับ quantity',
       e2.quantity === 3 && e2.available >= 0 && e2.available <= e2.quantity,
       `quantity=${e2.quantity} available=${e2.available}`);
-    const e4 = list.find((e) => e.id === 'e4');
-    check('imageUrl เป็น null ได้', e4.imageUrl === null);
+    check('imageUrl เป็น string หรือ null', list.every((e) => typeof e.imageUrl === 'string' || e.imageUrl === null));
   }
 
   console.log('\n-- Borrow shape ตรงกับ type Borrow --');
@@ -75,7 +76,7 @@ const STAFF = { as: 'staff' };
     const { body: mine } = await call('GET', '/borrows/mine');
     const keys = Object.keys(mine[0]).sort().join(',');
     check('field ครบและชื่อตรง',
-      keys === 'approvedAt,approvedBy,approverName,borrowerId,borrowerName,createdAt,dueDate,equipmentId,equipmentName,id,purpose,receivedBy,rejectReason,returnNote,returnedAt,status',
+      keys === 'approvedAt,approvedBy,approverName,borrowerId,borrowerName,createdAt,details,dueDate,equipmentId,equipmentName,id,purpose,receivedBy,rejectReason,returnNote,returnedAt,status',
       `got: ${keys}`);
     check('u1 เห็นแต่รายการตัวเอง', mine.every((b) => b.borrowerId === 'u1'));
     check('เรียงใหม่สุดขึ้นก่อน', mine[0].createdAt >= mine[mine.length - 1].createdAt);
@@ -232,6 +233,193 @@ const STAFF = { as: 'staff' };
     const past = await call('POST', '/borrows', { body: { equipmentId: 'e3', dueDate: yesterday } });
     check('เมื่อวาน (เวลาไทย) -> 400', past.status === 400, past.body.error);
   }
+
+  const at = (days) => new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+  const ADMIN = { as: 'admin' };
+  const { body: booked } = await call('POST', '/equipment', {
+    ...STAFF,
+    body: { name: 'จองล่วงหน้า', description: '', imageUrl: null, quantity: 1 }
+  });
+  const borrowWindow = (from, to, as = 'user') =>
+    call('POST', '/borrows', { as, body: { equipmentId: booked.id, startAt: at(from), endAt: at(to) } });
+
+  console.log('\n-- ช่วงเวลายืม --');
+  let current, future;
+  {
+    const now = await borrowWindow(0, 2);
+    check('ยืมแบบมีช่วงเวลา -> 201 + details', now.status === 201 && now.body.details?.startAt && now.body.details.pickedUpAt === null,
+      JSON.stringify(now.body));
+    current = now.body.id;
+    await call('PUT', `/borrows/${current}/approve`, STAFF);
+    check('อนุมัติแล้วคงเหลือตอนนี้เป็น 0', (await call('GET', `/equipment/${booked.id}`)).body.available === 0);
+
+    const later = await borrowWindow(7, 9);
+    check('ของหมดตอนนี้ แต่จองช่วงสัปดาห์หน้าได้', later.status === 201, later.body.error);
+    future = later.body.id;
+    check('อนุมัติช่วงที่ไม่ทับกันได้', (await call('PUT', `/borrows/${future}/approve`, STAFF)).status === 200);
+
+    const clash = await borrowWindow(1, 3);
+    check('จองทับช่วงที่เต็ม -> "อุปกรณ์ชิ้นนี้ถูกยืมหมดแล้ว"',
+      clash.status === 409 && clash.body.error === 'อุปกรณ์ชิ้นนี้ถูกยืมหมดแล้ว', clash.body.error);
+
+    check('เริ่มเมื่อวาน -> 400', (await borrowWindow(-1.5, 2)).status === 400);
+    check('สิ้นสุดก่อนเริ่ม -> 400', (await borrowWindow(3, 2)).status === 400);
+    const noTz = await call('POST', '/borrows', { body: { equipmentId: booked.id, startAt: '2030-01-01T09:00:00', endAt: at(9) } });
+    check('ไม่มี timezone -> 400', noTz.status === 400, noTz.body.error);
+  }
+
+  console.log('\n-- รับของ --');
+  {
+    const other = await call('PUT', `/borrows/${current}/pickup`, { as: 'user2' });
+    check('ผู้ใช้อื่นกดรับของแทนไม่ได้ -> 403', other.status === 403, other.body.error);
+
+    const picked = await call('PUT', `/borrows/${current}/pickup`);
+    check('ผู้ยืมกดรับของเองได้', picked.status === 200 && !!picked.body.details?.pickedUpAt && picked.body.details.pickedUpBy === 'u1',
+      JSON.stringify(picked.body.details ?? picked.body));
+
+    const again = await call('PUT', `/borrows/${current}/pickup`);
+    check('กดรับของซ้ำ -> 409', again.status === 409, again.body.error);
+
+    const legacy = await call('PUT', '/borrows/b1/pickup', { as: 'user2' });
+    check('รับของรายการที่รับไปแล้ว -> 409', legacy.status === 409, legacy.body.error);
+
+    check('staff กดส่งมอบให้ได้', (await call('PUT', `/borrows/${future}/pickup`, STAFF)).status === 200);
+
+    const { body: logs } = await call('GET', `/equipment/${booked.id}/logs`, STAFF);
+    check('บันทึก borrow_picked_up ลงประวัติ', logs.some((l) => l.borrowId === current && l.action === 'borrow_picked_up'));
+
+    await call('PUT', `/borrows/${current}/confirm-return`, STAFF);
+    check('คืนแล้ว การจองล่วงหน้าไม่ทำให้คงเหลือตอนนี้เป็น 0',
+      (await call('GET', `/equipment/${booked.id}`)).body.available === 1);
+  }
+
+  console.log('\n-- แผนก --');
+  let departmentId;
+  {
+    const name = `ทดสอบ ${Date.now()}`;
+    const created = await call('POST', '/departments', { ...ADMIN, body: { name } });
+    check('admin สร้างแผนก -> 201', created.status === 201 && created.body.name === name);
+    departmentId = created.body.id;
+
+    check('ชื่อซ้ำ -> 409', (await call('POST', '/departments', { ...ADMIN, body: { name } })).status === 409);
+    check('staff สร้างแผนกไม่ได้ -> 403', (await call('POST', '/departments', { ...STAFF, body: { name: 'x' } })).status === 403);
+    check('รหัสแผนกไม่ใช่ตัวเลข -> 400', (await call('GET', '/departments/abc/equipment')).status === 400);
+    check('แผนกที่ไม่มี -> 404', (await call('GET', '/departments/999999999/equipment')).status === 404);
+
+    await call('PUT', `/departments/${departmentId}/equipment/${booked.id}`, ADMIN);
+    const { body: list } = await call('GET', `/departments/${departmentId}/equipment`);
+    check('อุปกรณ์ในแผนกหน้าตาเดียวกับ Equipment',
+      list.length === 1 && Object.keys(list[0]).sort().join(',') === EQUIPMENT_KEYS,
+      JSON.stringify(list));
+
+    const req = (await borrowWindow(20, 21)).body.id;
+    const denied = await call('PUT', `/borrows/${req}/approve`, STAFF);
+    check('staff นอกแผนกอนุมัติไม่ได้ -> 403', denied.status === 403, denied.body.error);
+    check('staff นอกแผนกไม่เห็นคำขอของแผนกนี้',
+      !(await call('GET', '/borrows', STAFF)).body.some((b) => b.id === req));
+    check('admin เห็นทุกคำขอ', (await call('GET', '/borrows', ADMIN)).body.some((b) => b.id === req));
+
+    await call('PUT', `/departments/${departmentId}/staff/u2`, ADMIN);
+    check('staff ในแผนกเห็นคำขอ', (await call('GET', '/borrows', STAFF)).body.some((b) => b.id === req));
+    check('staff ในแผนกอนุมัติได้', (await call('PUT', `/borrows/${req}/approve`, STAFF)).status === 200);
+    await call('PUT', `/borrows/${req}/confirm-return`, STAFF);
+
+    const dep = (await call('GET', '/departments', ADMIN)).body.find((d) => d.id === departmentId);
+    check('รายการแผนกบอก staff และจำนวนอุปกรณ์',
+      dep?.equipmentCount === 1 && dep.staff.some((s) => s.id === 'u2' && s.fullName),
+      JSON.stringify(dep));
+    const seenByUser = (await call('GET', '/departments')).body.find((d) => d.id === departmentId);
+    check('ผู้ยืมเห็นชื่อแผนกแต่ไม่เห็นรายชื่อ/อีเมลเจ้าหน้าที่',
+      seenByUser?.name === dep?.name && seenByUser.staff.length === 0);
+    check('/me บอกแผนกที่ staff ดูแล',
+      (await call('GET', '/me', STAFF)).body.departmentIds?.includes(departmentId));
+    const { body: item } = await call('GET', `/equipment/${booked.id}`);
+    check('อุปกรณ์บอกชื่อแผนก', item.departmentId === departmentId && item.departmentName === dep?.name);
+
+    check('เอา staff ออกจากแผนก -> 204',
+      (await call('DELETE', `/departments/${departmentId}/staff/u2`, ADMIN)).status === 204);
+    const req2 = (await borrowWindow(22, 23)).body.id;
+    check('เอาออกแล้ว staff อนุมัติไม่ได้อีก',
+      (await call('PUT', `/borrows/${req2}/approve`, STAFF)).status === 403);
+    await call('PUT', `/borrows/${req2}/cancel`);
+
+    check('เอาอุปกรณ์ออกจากแผนก -> 204',
+      (await call('DELETE', `/departments/${departmentId}/equipment/${booked.id}`, ADMIN)).status === 204);
+    check('เอาออกแล้วกลับเป็นไม่สังกัดแผนก',
+      (await call('GET', `/equipment/${booked.id}`)).body.departmentId === null);
+    check('staff สั่งเอาของออกจากแผนกไม่ได้ -> 403',
+      (await call('DELETE', `/departments/${departmentId}/equipment/${booked.id}`, STAFF)).status === 403);
+
+    // ตั้งแผนกจากฟอร์มอุปกรณ์ — admin ได้ / staff ส่งมาก็ไม่มีผล
+    const form = { name: booked.name, description: '', imageUrl: null, quantity: 1 };
+    await call('PUT', `/equipment/${booked.id}`, { ...STAFF, body: { ...form, departmentId } });
+    check('staff ตั้งแผนกจากฟอร์มไม่ได้ (ไม่มีผล)',
+      (await call('GET', `/equipment/${booked.id}`)).body.departmentId === null);
+    const set = await call('PUT', `/equipment/${booked.id}`, { ...ADMIN, body: { ...form, departmentId } });
+    check('admin ตั้งแผนกจากฟอร์มได้', set.body.departmentId === departmentId, JSON.stringify(set.body));
+    const keep = await call('PUT', `/equipment/${booked.id}`, { ...ADMIN, body: form });
+    check('แก้อุปกรณ์โดยไม่ส่ง departmentId = แผนกเดิมไม่หาย', keep.body.departmentId === departmentId);
+    check('แผนกที่ไม่มีอยู่ -> 404',
+      (await call('PUT', `/equipment/${booked.id}`, { ...ADMIN, body: { ...form, departmentId: 999999999 } })).status === 404);
+
+    // แก้ชื่อ / ลบแผนก
+    const renamed = await call('PUT', `/departments/${departmentId}`, { ...ADMIN, body: { name: `${name} (ใหม่)` } });
+    check('admin แก้ชื่อแผนกได้', renamed.status === 200 && renamed.body.name === `${name} (ใหม่)`, JSON.stringify(renamed.body));
+    const other = (await call('GET', '/departments', ADMIN)).body.find((d) => d.id !== departmentId);
+    if (other) {
+      check('แก้เป็นชื่อที่ซ้ำ -> 409',
+        (await call('PUT', `/departments/${departmentId}`, { ...ADMIN, body: { name: other.name } })).status === 409);
+    }
+    check('staff แก้ชื่อแผนกไม่ได้ -> 403',
+      (await call('PUT', `/departments/${departmentId}`, { ...STAFF, body: { name: 'x' } })).status === 403);
+    const removed = await call('DELETE', `/departments/${departmentId}`, ADMIN);
+    check('ลบแผนก -> บอกจำนวนอุปกรณ์ที่ถูกปลดออก', removed.status === 200 && removed.body.unassigned === 1, JSON.stringify(removed.body));
+    check('ลบแผนกแล้วอุปกรณ์ไม่หาย แค่ไม่สังกัดแผนก',
+      (await call('GET', `/equipment/${booked.id}`)).body.departmentId === null);
+  }
+
+  console.log('\n-- ช่วงที่ถูกจองแล้ว --');
+  {
+    const res = await call('GET', '/equipment/e2/bookings');
+    check('ผู้ยืมดูช่วงที่ถูกจองได้', res.status === 200 && Array.isArray(res.body));
+    check('มีช่วงของรายการที่อนุมัติแล้ว (b1)', res.body.some((b) => b.startAt && b.endAt));
+    check('ไม่มีข้อมูลผู้ยืมหลุดออกมา',
+      res.body.every((b) => Object.keys(b).sort().join(',') === 'endAt,startAt'), JSON.stringify(res.body[0]));
+    check('อุปกรณ์ที่ไม่มี -> 404', (await call('GET', '/equipment/nope/bookings')).status === 404);
+  }
+
+  console.log('\n-- QR --');
+  {
+    const res = await fetch(`${BASE}/qr/equipment/e3.svg`, { headers: { Cookie: cookies.user } });
+    const body = await res.text();
+    check('รูป QR เป็น SVG', res.ok && res.headers.get('content-type')?.startsWith('image/svg+xml') && body.startsWith('<svg'));
+    check('QR ของที่ไม่มี -> 404',
+      (await fetch(`${BASE}/qr/equipment/nope.svg`, { headers: { Cookie: cookies.user } })).status === 404);
+    check('ยังไม่ login ดู QR ไม่ได้ -> 401', (await fetch(`${BASE}/qr/equipment/e3.svg`)).status === 401);
+  }
+
+  console.log('\n-- กลับหน้าเดิมหลัง login --');
+  {
+    const { body: { providers } } = await call('GET', '/auth/providers');
+    if (providers.length === 0) {
+      console.log('  skip ยังไม่ได้ตั้งค่า OAuth');
+    } else {
+      // จำหน้าไว้ในคุกกี้ก่อนเด้งไป provider — callback อ่านคุกกี้นี้แล้วพากลับ
+      const nextCookie = async (next) => {
+        const res = await fetch(`${BASE}/auth/${providers[0].name}?next=${encodeURIComponent(next)}`, { redirect: 'manual' });
+        const m = (res.headers.get('set-cookie') ?? '').match(/pf_oauth_next=([^;]*)/);
+        return m ? decodeURIComponent(m[1]) : null;
+      };
+      check('จำหน้าในแอปไว้ได้', (await nextCookie('/equipment/e3')) === '/equipment/e3');
+      check('ลิงก์เว็บอื่น -> กลับหน้าแรกแทน', (await nextCookie('//evil.example')) === '/');
+      check('URL เต็ม -> กลับหน้าแรกแทน', (await nextCookie('https://evil.example')) === '/');
+    }
+  }
+
+  // เก็บกวาด — ต้องคืนของก่อนถึงลบอุปกรณ์ได้ และต้องลบอุปกรณ์ก่อนถึงลบแผนกได้
+  await call('PUT', `/borrows/${future}/confirm-return`, ADMIN);
+  await call('DELETE', `/equipment/${booked.id}`, ADMIN);
+  await dbConn`DELETE FROM departments WHERE id = ${departmentId}`;
 
   console.log('\n-- CRUD อุปกรณ์ --');
   {

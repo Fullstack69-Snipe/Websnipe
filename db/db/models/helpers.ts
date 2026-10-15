@@ -10,7 +10,7 @@
 // frontend/src/types.ts ประกาศ createdAt / returnedAt เป็น string
 // จึงต้องแปลงกลับเป็น ISO string ทุกครั้งก่อนส่งออก
 
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { HOLDING_STATUSES } from "@db/schema.js";
 
 /** Date -> ISO string (ของที่ NOT NULL ใน schema) */
@@ -26,6 +26,27 @@ export const toIsoOrNull = (value: Date | null): string | null =>
  */
 export const firstOrUndefined = <T>(rows: T[]): T | undefined => rows[0];
 
+const isHoldingSql = sql`"borrows"."status" = ANY(ARRAY[${sql.join(
+  HOLDING_STATUSES.map((status) => sql`${status}`),
+  sql`, `,
+)}]::borrow_status[])`;
+
+// Date ใน sql`` ดิบถูกส่งเป็น Date.toString() ซึ่ง Postgres อ่านไม่ออก ต้องแปลงเป็น ISO เอง
+const ts = (value: SQL | Date) =>
+  value instanceof Date ? sql`${value.toISOString()}::timestamptz` : value;
+
+/**
+ * แถว borrows นี้จองทับช่วง [start, end) หรือไม่
+ * - รายการเก่าที่ไม่มีช่วงเวลา ถือว่าทับทุกช่วงจนกว่าจะคืน
+ * - เลยกำหนดแล้วยังไม่คืน ไม่รู้ว่าจะได้ของคืนเมื่อไหร่ จึงถือว่าทับไปเรื่อยๆ
+ */
+export const overlapsSql = (start: SQL | Date, end: SQL | Date) => sql`(
+  "borrows"."start_at" IS NULL OR (
+    "borrows"."start_at" < ${ts(end)}
+    AND (CASE WHEN "borrows"."end_at" <= now() THEN 'infinity'::timestamptz ELSE "borrows"."end_at" END) > ${ts(start)}
+  )
+)`;
+
 /**
  * จำนวนที่ถูกยืมอยู่ของอุปกรณ์แต่ละชิ้น (นับเฉพาะสถานะใน HOLDING_STATUSES)
  * ใช้เป็น subquery ซ้ำได้ทั้งใน SELECT และที่อื่น
@@ -36,13 +57,14 @@ export const firstOrUndefined = <T>(rows: T[]): T | undefined => rows[0];
 // ถูก render เป็น WHERE "equipment_id" = "id" — ซึ่ง "id" ไปตรงกับ borrows.id
 // (ตาราง borrows มีคอลัมน์ id อยู่จริง) Postgres จึงไม่ error แต่ได้ตัวเลขผิดเงียบๆ
 // เขียน "borrows"."equipment_id" = "equipment"."id" ตรงๆ จึงชัวร์กว่า
-//
-// ส่วนค่าสถานะยังส่งเป็น parameter ตามปกติ
 export const holdingCountSql = sql<number>`(
   SELECT COUNT(*)::int FROM "borrows"
-  WHERE "borrows"."equipment_id" = "equipment"."id"
-    AND "borrows"."status" = ANY(ARRAY[${sql.join(
-      HOLDING_STATUSES.map((status) => sql`${status}`),
-      sql`, `,
-    )}]::borrow_status[])
+  WHERE "borrows"."equipment_id" = "equipment"."id" AND ${isHoldingSql}
+)`;
+
+/** เหมือน holdingCountSql แต่นับเฉพาะที่ไม่อยู่บนชั้นตอนนี้ — การจองล่วงหน้าไม่นับ */
+export const holdingNowSql = sql<number>`(
+  SELECT COUNT(*)::int FROM "borrows"
+  WHERE "borrows"."equipment_id" = "equipment"."id" AND ${isHoldingSql}
+    AND ${overlapsSql(sql`now()`, sql`now()`)}
 )`;

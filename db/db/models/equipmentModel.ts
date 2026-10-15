@@ -10,10 +10,11 @@ import { dbClient } from "@db/client.js";
 import {
   borrowsTable,
   categoriesTable,
+  departmentsTable,
   equipmentTable,
   HOLDING_STATUSES,
 } from "@db/schema.js";
-import { firstOrUndefined, holdingCountSql } from "@db/models/helpers.js";
+import { firstOrUndefined, holdingCountSql, holdingNowSql } from "@db/models/helpers.js";
 import { logModel } from "@db/models/logModel.js";
 import type { Actor } from "@db/models/borrowModel.js";
 
@@ -29,6 +30,8 @@ export type EquipmentRow = {
   available: number;
   categoryId: number | null;
   categoryName: string | null;
+  departmentId: number | null;
+  departmentName: string | null;
 };
 
 export type EquipmentInput = {
@@ -37,6 +40,8 @@ export type EquipmentInput = {
   imageUrl?: string | null;
   quantity: number;
   categoryId?: number | null;
+  // undefined = ไม่แตะแผนกเดิม (staff แก้อุปกรณ์ได้ แต่ย้ายแผนกไม่ได้)
+  departmentId?: number | null;
 };
 
 // ดึง quantity กับจำนวนที่ถือของอยู่มาก่อน แล้วค่อยลบกันในชั้น JS
@@ -49,7 +54,9 @@ const selection = {
   quantity: equipmentTable.quantity,
   categoryId: equipmentTable.categoryId,
   categoryName: categoriesTable.name,
-  holding: holdingCountSql,
+  departmentId: equipmentTable.departmentId,
+  departmentName: departmentsTable.name,
+  holding: holdingNowSql,
 };
 
 // left join เพราะอุปกรณ์ไม่จำเป็นต้องมีหมวดหมู่
@@ -57,7 +64,8 @@ const baseQuery = () =>
   dbClient
     .select(selection)
     .from(equipmentTable)
-    .leftJoin(categoriesTable, eq(categoriesTable.id, equipmentTable.categoryId));
+    .leftJoin(categoriesTable, eq(categoriesTable.id, equipmentTable.categoryId))
+    .leftJoin(departmentsTable, eq(departmentsTable.id, equipmentTable.departmentId));
 
 const toEquipmentRow = (row: {
   id: string;
@@ -67,6 +75,8 @@ const toEquipmentRow = (row: {
   quantity: number;
   categoryId: number | null;
   categoryName: string | null;
+  departmentId: number | null;
+  departmentName: string | null;
   holding: number;
 }): EquipmentRow => {
   const { holding, ...rest } = row;
@@ -74,8 +84,14 @@ const toEquipmentRow = (row: {
 };
 
 export const equipmentModel = {
-  async listAll(): Promise<EquipmentRow[]> {
-    const rows = await baseQuery().orderBy(equipmentTable.createdAt);
+  async listAll(opts: { departmentId?: number } = {}): Promise<EquipmentRow[]> {
+    const rows = await baseQuery()
+      .where(
+        opts.departmentId === undefined
+          ? undefined
+          : eq(equipmentTable.departmentId, opts.departmentId),
+      )
+      .orderBy(equipmentTable.createdAt);
     return rows.map(toEquipmentRow);
   },
 
@@ -110,6 +126,7 @@ export const equipmentModel = {
         imageUrl: input.imageUrl ?? null,
         quantity: input.quantity,
         categoryId: input.categoryId ?? null,
+        departmentId: input.departmentId ?? null,
       });
 
       await logModel.write(
@@ -145,6 +162,7 @@ export const equipmentModel = {
           imageUrl: input.imageUrl ?? null,
           quantity: input.quantity,
           categoryId: input.categoryId ?? null,
+          ...(input.departmentId !== undefined ? { departmentId: input.departmentId } : {}),
         })
         .where(eq(equipmentTable.id, id));
 

@@ -7,18 +7,19 @@
 // ถ้าแยกกันเขียนจะมีจังหวะที่สถานะเปลี่ยนแล้วแต่ log หาย ประวัติจะเชื่อไม่ได้
 
 import crypto from "node:crypto";
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { dbClient } from "@db/client.js";
 import {
   borrowsTable,
   equipmentTable,
   HOLDING_STATUSES,
+  staffDepartmentsTable,
   usersTable,
   type BorrowStatus,
   type LogAction,
 } from "@db/schema.js";
-import { firstOrUndefined, toIso, toIsoOrNull } from "@db/models/helpers.js";
+import { firstOrUndefined, overlapsSql, toIso, toIsoOrNull } from "@db/models/helpers.js";
 import { logModel } from "@db/models/logModel.js";
 
 /** ผู้ที่ลงมือทำ ใช้บันทึกลงประวัติ */
@@ -28,9 +29,10 @@ export type Actor = { id: string; fullName: string };
  * เปลี่ยนสถานะไม่ได้ เพราะข้อมูลเปลี่ยนไประหว่างที่ controller ตรวจกับตอนเขียนจริง
  *   status_changed — มีคนเปลี่ยนสถานะไปก่อน เช่น ผู้ยืมกดยกเลิกจังหวะเดียวกับที่ staff กดอนุมัติ
  *   unavailable    — ของชิ้นสุดท้ายถูกอนุมัติให้คนอื่นไปก่อน
+ *   already_picked_up — กดรับของซ้ำ หรือเป็นรายการเก่าที่ไม่มีช่วงเวลายืม
  */
 export class BorrowConflictError extends Error {
-  readonly reason: "status_changed" | "unavailable";
+  readonly reason: "status_changed" | "unavailable" | "already_picked_up";
 
   constructor(reason: BorrowConflictError["reason"]) {
     super(reason);
@@ -56,7 +58,20 @@ export type BorrowRow = {
   returnNote: string | null;
   createdAt: string;
   returnedAt: string | null;
+  // null = รายการเก่าก่อนมีช่วงเวลายืม
+  details: BorrowDetails | null;
 };
+
+export type BorrowDetails = {
+  borrowId: string;
+  startAt: string;
+  endAt: string;
+  pickedUpAt: string | null;
+  pickedUpBy: string | null;
+};
+
+// dbClient กับ tx ใช้ API ชุดเดียวกัน จึงรับตัวไหนก็ได้
+type Executor = Pick<typeof dbClient, "select">;
 
 // alias แยกสองตัวเพราะ users ถูก join ซ้ำ (ผู้ยืม กับ ผู้อนุมัติ)
 const approver = alias(usersTable, "approver");
@@ -78,6 +93,10 @@ const selection = {
   returnNote: borrowsTable.returnNote,
   createdAt: borrowsTable.createdAt,
   returnedAt: borrowsTable.returnedAt,
+  startAt: borrowsTable.startAt,
+  endAt: borrowsTable.endAt,
+  pickedUpAt: borrowsTable.pickedUpAt,
+  pickedUpBy: borrowsTable.pickedUpBy,
 };
 
 const baseQuery = () =>
@@ -89,18 +108,52 @@ const baseQuery = () =>
     // left join เพราะรายการที่ยังไม่ถูกอนุมัติยังไม่มีผู้อนุมัติ
     .leftJoin(approver, eq(approver.id, borrowsTable.approvedBy));
 
-type RawRow = Omit<BorrowRow, "createdAt" | "returnedAt" | "approvedAt"> & {
+type RawRow = Omit<BorrowRow, "createdAt" | "returnedAt" | "approvedAt" | "details"> & {
   createdAt: Date;
   returnedAt: Date | null;
   approvedAt: Date | null;
+  startAt: Date | null;
+  endAt: Date | null;
+  pickedUpAt: Date | null;
+  pickedUpBy: string | null;
 };
 
-const toBorrowRow = (row: RawRow): BorrowRow => ({
+const toBorrowRow = ({ startAt, endAt, pickedUpAt, pickedUpBy, ...row }: RawRow): BorrowRow => ({
   ...row,
   createdAt: toIso(row.createdAt),
   returnedAt: toIsoOrNull(row.returnedAt),
   approvedAt: toIsoOrNull(row.approvedAt),
+  details:
+    startAt && endAt
+      ? {
+          borrowId: row.id,
+          startAt: toIso(startAt),
+          endAt: toIso(endAt),
+          pickedUpAt: toIsoOrNull(pickedUpAt),
+          pickedUpBy,
+        }
+      : null,
 });
+
+/** จำนวนที่อนุมัติแล้วและจองทับช่วงนี้ — ไม่มีช่วงเวลา = ตั้งแต่ตอนนี้ไปจนกว่าจะคืน */
+const bookedCount = async (
+  equipmentId: string,
+  start: Date | null,
+  end: Date | null,
+  db: Executor = dbClient,
+): Promise<number> => {
+  const [row] = await db
+    .select({ n: count() })
+    .from(borrowsTable)
+    .where(
+      and(
+        eq(borrowsTable.equipmentId, equipmentId),
+        inArray(borrowsTable.status, [...HOLDING_STATUSES]),
+        overlapsSql(start ?? sql`now()`, end ?? sql`'infinity'::timestamptz`),
+      ),
+    );
+  return row?.n ?? 0;
+};
 
 // สถานะ -> action ที่บันทึกลงประวัติ
 const ACTION_FOR: Partial<Record<BorrowStatus, LogAction>> = {
@@ -112,8 +165,44 @@ const ACTION_FOR: Partial<Record<BorrowStatus, LogAction>> = {
 };
 
 export const borrowModel = {
-  async listAll(): Promise<BorrowRow[]> {
-    const rows = await baseQuery().orderBy(desc(borrowsTable.createdAt));
+  bookedCount,
+
+  /**
+   * ช่วงที่อุปกรณ์ชิ้นนี้ถูกจองไว้แล้ว (อนุมัติแล้วยังไม่คืน) ให้หน้าขอยืมเลือกวันได้ถูก
+   * ไม่ส่งชื่อผู้ยืม เพราะผู้ยืมทุกคนเรียกได้ — null = รายการเก่าที่ไม่มีช่วงเวลา (จองจนกว่าจะคืน)
+   */
+  async bookingsOf(equipmentId: string): Promise<{ startAt: string | null; endAt: string | null }[]> {
+    const rows = await dbClient
+      .select({ startAt: borrowsTable.startAt, endAt: borrowsTable.endAt })
+      .from(borrowsTable)
+      .where(
+        and(
+          eq(borrowsTable.equipmentId, equipmentId),
+          inArray(borrowsTable.status, [...HOLDING_STATUSES]),
+        ),
+      )
+      .orderBy(borrowsTable.startAt);
+    return rows.map((r) => ({ startAt: toIsoOrNull(r.startAt), endAt: toIsoOrNull(r.endAt) }));
+  },
+
+  /** staffId = เห็นเฉพาะอุปกรณ์ในแผนกที่ดูแล + อุปกรณ์ที่ไม่สังกัดแผนก */
+  async listAll(opts: { staffId?: string } = {}): Promise<BorrowRow[]> {
+    const rows = await baseQuery()
+      .where(
+        opts.staffId === undefined
+          ? undefined
+          : or(
+              isNull(equipmentTable.departmentId),
+              inArray(
+                equipmentTable.departmentId,
+                dbClient
+                  .select({ id: staffDepartmentsTable.departmentId })
+                  .from(staffDepartmentsTable)
+                  .where(eq(staffDepartmentsTable.userId, opts.staffId)),
+              ),
+            ),
+      )
+      .orderBy(desc(borrowsTable.createdAt));
     return rows.map(toBorrowRow);
   },
 
@@ -136,6 +225,8 @@ export const borrowModel = {
       equipmentId: string;
       borrowerId: string;
       dueDate: string;
+      startAt?: Date | null;
+      endAt?: Date | null;
       purpose?: string | null;
     },
     actor?: Actor,
@@ -148,6 +239,8 @@ export const borrowModel = {
         equipmentId: input.equipmentId,
         borrowerId: input.borrowerId,
         dueDate: input.dueDate,
+        startAt: input.startAt ?? null,
+        endAt: input.endAt ?? null,
         purpose: input.purpose ?? null,
         status: "pending",
       });
@@ -220,17 +313,14 @@ export const borrowModel = {
           .where(eq(equipmentTable.id, before.equipmentId))
           .for("update");
 
-        const [holding] = await tx
-          .select({ n: count() })
-          .from(borrowsTable)
-          .where(
-            and(
-              eq(borrowsTable.equipmentId, before.equipmentId),
-              inArray(borrowsTable.status, [...HOLDING_STATUSES]),
-            ),
-          );
+        const booked = await bookedCount(
+          before.equipmentId,
+          before.details ? new Date(before.details.startAt) : null,
+          before.details ? new Date(before.details.endAt) : null,
+          tx,
+        );
 
-        if (!item || (holding?.n ?? 0) >= item.quantity) {
+        if (!item || booked >= item.quantity) {
           throw new BorrowConflictError("unavailable");
         }
       }
@@ -271,6 +361,43 @@ export const borrowModel = {
           tx,
         );
       }
+    });
+
+    return borrowModel.findById(id);
+  },
+
+  /** ยืนยันว่ารับของแล้ว — ทำได้ครั้งเดียว เฉพาะรายการที่อนุมัติแล้วและมีช่วงเวลายืม */
+  async pickup(id: string, actor: Actor): Promise<BorrowRow | undefined> {
+    const before = await borrowModel.findById(id);
+    if (!before) return undefined;
+
+    await dbClient.transaction(async (tx) => {
+      const updated = await tx
+        .update(borrowsTable)
+        .set({ pickedUpAt: new Date(), pickedUpBy: actor.id })
+        .where(
+          and(
+            eq(borrowsTable.id, id),
+            eq(borrowsTable.status, "approved"),
+            isNull(borrowsTable.pickedUpAt),
+            sql`${borrowsTable.startAt} IS NOT NULL`,
+          ),
+        )
+        .returning({ id: borrowsTable.id });
+
+      if (updated.length === 0) throw new BorrowConflictError("already_picked_up");
+
+      await logModel.write(
+        {
+          equipmentId: before.equipmentId,
+          equipmentName: before.equipmentName,
+          borrowId: id,
+          actorId: actor.id,
+          actorName: actor.fullName,
+          action: "borrow_picked_up",
+        },
+        tx,
+      );
     });
 
     return borrowModel.findById(id);

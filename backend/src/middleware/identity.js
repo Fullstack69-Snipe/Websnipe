@@ -6,7 +6,7 @@
 // เดิมระบบอ่าน x-user-id / x-role จาก header ซึ่งแปลว่าใครก็ตาม
 // ส่ง `x-role: admin` มาก็ได้สิทธิ์เต็ม ตอนนี้เอาออกหมดแล้ว
 
-const { authModel } = require('db');
+const { authModel, departmentModel } = require('db');
 const { forbidden, unauthorized } = require('../utils/HttpError');
 
 const SESSION_COOKIE = 'pf_session';
@@ -41,4 +41,12 @@ function requireRole(...allowed) {
   };
 }
 
-module.exports = { attachIdentity, requireRole, SESSION_COOKIE };
+// staff จัดการได้เฉพาะอุปกรณ์ในแผนกที่ตัวเองดูแล (หรือที่ไม่สังกัดแผนก) admin ได้ทุกชิ้น
+async function assertCanManage(user, equipmentId) {
+  if (user.role === 'admin') return;
+  if (!await departmentModel.staffCanManage(user.id, equipmentId)) {
+    throw forbidden('เจ้าหน้าที่ไม่มีสิทธิ์จัดการอุปกรณ์ของแผนกนี้');
+  }
+}
+
+module.exports = { attachIdentity, requireRole, assertCanManage, SESSION_COOKIE };

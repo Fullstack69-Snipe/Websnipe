@@ -8,6 +8,7 @@ import {
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -36,6 +37,7 @@ export const logActionEnum = pgEnum("log_action", [
   "borrow_return_requested",
   "borrow_returned",
   "borrow_cancelled",
+  "borrow_picked_up",
 ]);
 
 export const borrowStatusEnum = pgEnum("borrow_status", [
@@ -100,6 +102,16 @@ export const categoriesTable = pgTable(
   ],
 );
 
+// ---------- departments ----------
+// แผนก — staff จัดการได้เฉพาะอุปกรณ์ในแผนกที่ตัวเองดูแล (admin จัดการได้ทุกแผนก)
+export const departmentsTable = pgTable("departments", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  name: varchar("name", { length: 120 }).notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
 // ---------- equipment ----------
 // ไม่มีคอลัมน์ available — คำนวณสดจาก borrows ทุกครั้ง (quantity - จำนวนที่ถือของอยู่)
 // เพื่อไม่ให้ข้อมูลไม่ตรงกัน (drift) จากการเก็บตัวเลขซ้ำสองที่
@@ -115,6 +127,11 @@ export const equipmentTable = pgTable(
     categoryId: bigint("category_id", { mode: "number" }).references(
       () => categoriesTable.id,
       { onDelete: "set null" },
+    ),
+    // null = ไม่สังกัดแผนก staff ทุกคนจัดการได้
+    departmentId: bigint("department_id", { mode: "number" }).references(
+      () => departmentsTable.id,
+      { onDelete: "restrict" },
     ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -163,6 +180,16 @@ export const borrowsTable = pgTable(
     ),
     returnNote: text("return_note"),
 
+    // ช่วงเวลายืม — null ทั้งคู่ = รายการเก่าก่อนมีช่วงเวลา (ถือว่าจองไว้จนกว่าจะคืน)
+    startAt: timestamp("start_at", { withTimezone: true }),
+    endAt: timestamp("end_at", { withTimezone: true }),
+    // ผู้ยืมมารับของจริงเมื่อไหร่ และใครเป็นคนกดยืนยัน
+    pickedUpAt: timestamp("picked_up_at", { withTimezone: true }),
+    pickedUpBy: varchar("picked_up_by", { length: 64 }).references(
+      () => usersTable.id,
+      { onDelete: "restrict" },
+    ),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -179,7 +206,27 @@ export const borrowsTable = pgTable(
       "borrows_returned_at_matches_status",
       sql`(${table.status} = 'returned') = (${table.returnedAt} IS NOT NULL)`,
     ),
+    check(
+      "borrows_period_valid",
+      sql`(${table.startAt} IS NULL AND ${table.endAt} IS NULL) OR ${table.endAt} > ${table.startAt}`,
+    ),
+    index("idx_borrows_period").on(table.startAt, table.endAt),
   ],
+);
+
+// ---------- staff_departments ----------
+// staff หนึ่งคนดูแลได้หลายแผนก
+export const staffDepartmentsTable = pgTable(
+  "staff_departments",
+  {
+    userId: varchar("user_id", { length: 64 })
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    departmentId: bigint("department_id", { mode: "number" })
+      .notNull()
+      .references(() => departmentsTable.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.departmentId] })],
 );
 
 // ---------- user_identities ----------
@@ -365,4 +412,5 @@ export type NewSession = typeof sessionsTable.$inferInsert;
 export type Category = typeof categoriesTable.$inferSelect;
 export type NewCategory = typeof categoriesTable.$inferInsert;
 export type EquipmentLog = typeof equipmentLogsTable.$inferSelect;
+export type Department = typeof departmentsTable.$inferSelect;
 export type NewEquipmentLog = typeof equipmentLogsTable.$inferInsert;

@@ -1,10 +1,10 @@
-const store = require('../services/featureStore');
 // src/controllers/equipmentController.js
 // ตรงกับ mockApi: listEquipment / createEquipment / updateEquipment / deleteEquipment
 
 const equipmentModel = require('../models/equipmentModel');
-const { logModel } = require('db');
+const { logModel, departmentModel, borrowModel } = require('db');
 const { badRequest, notFound, conflict } = require('../utils/HttpError');
+const { assertCanManage } = require('../middleware/identity');
 
 // ตรวจ EquipmentInput = { name, description, imageUrl, quantity }
 function parseInput(body) {
@@ -38,6 +38,19 @@ function parseInput(body) {
   };
 }
 
+// แผนกตั้งได้เฉพาะ admin — staff ส่งมาก็ไม่สนใจ (กันย้ายของออกจากแผนกที่ตัวเองดูแลแล้วจัดการไม่ได้อีก)
+// ไม่ส่ง departmentId มาเลย = ไม่แตะแผนกเดิม / null หรือ '' = ไม่สังกัดแผนก
+async function withDepartment(input, req) {
+  const raw = req.body.departmentId;
+  if (req.role !== 'admin' || raw === undefined) return input;
+  if (raw === null || raw === '') return { ...input, departmentId: null };
+
+  const departmentId = Number(raw);
+  if (!Number.isSafeInteger(departmentId) || departmentId <= 0) throw badRequest('แผนกไม่ถูกต้อง');
+  if (!await departmentModel.findById(departmentId)) throw notFound('ไม่พบแผนก');
+  return { ...input, departmentId };
+}
+
 const equipmentController = {
   // GET /api/equipment
   async list(req, res) {
@@ -51,9 +64,15 @@ const equipmentController = {
     res.json(item);
   },
 
+  // GET /api/equipment/:id/bookings — ช่วงที่ถูกจองแล้ว (ไม่มีชื่อผู้ยืม)
+  async bookings(req, res) {
+    if (!await equipmentModel.findById(req.params.id)) throw notFound('ไม่พบอุปกรณ์');
+    res.json(await borrowModel.bookingsOf(req.params.id));
+  },
+
   // POST /api/equipment
   async create(req, res) {
-    const input = parseInput(req.body);
+    const input = await withDepartment(parseInput(req.body), req);
     res.status(201).json(await equipmentModel.create(input, req.user));
   },
 
@@ -62,8 +81,8 @@ const equipmentController = {
     const { id } = req.params;
     if (!await equipmentModel.findById(id)) throw notFound('ไม่พบอุปกรณ์');
 
-    await store.assertStaffAccess(req.user, id);
-    const input = parseInput(req.body);
+    await assertCanManage(req.user, id);
+    const input = await withDepartment(parseInput(req.body), req);
 
     // กันลดจำนวนต่ำกว่าที่ถูกยืมอยู่ (ข้อความเดียวกับ mockApi)
     const holding = await equipmentModel.borrowedCount(id);
@@ -79,7 +98,7 @@ const equipmentController = {
     const { id } = req.params;
     if (!await equipmentModel.findById(id)) throw notFound('ไม่พบอุปกรณ์');
 
-    await store.assertStaffAccess(req.user, id);
+    await assertCanManage(req.user, id);
     res.json(await logModel.listByEquipment(id));
   },
 
@@ -88,7 +107,7 @@ const equipmentController = {
     const { id } = req.params;
     if (!await equipmentModel.findById(id)) throw notFound('ไม่พบอุปกรณ์');
 
-    await store.assertStaffAccess(req.user, id);
+    await assertCanManage(req.user, id);
     if (await equipmentModel.borrowedCount(id) > 0) {
       throw conflict('อุปกรณ์กำลังถูกยืมอยู่ ลบไม่ได้');
     }

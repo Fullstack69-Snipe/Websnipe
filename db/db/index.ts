@@ -11,9 +11,11 @@ export { connectionString } from "@db/utils.js";
 export {
   borrowsTable,
   categoriesTable,
+  departmentsTable,
   equipmentTable,
   equipmentLogsTable,
   sessionsTable,
+  staffDepartmentsTable,
   userIdentitiesTable,
   usersTable,
   authProviderEnum,
@@ -32,6 +34,7 @@ export {
   type UserIdentity,
   type AuthProvider,
   type Category,
+  type Department,
   type EquipmentLog,
   type LogAction,
 } from "@db/schema.js";
@@ -41,7 +44,13 @@ export {
   BorrowConflictError,
   type Actor,
   type BorrowRow,
+  type BorrowDetails,
 } from "@db/models/borrowModel.js";
+export {
+  departmentModel,
+  type DepartmentRow,
+  type DepartmentDetail,
+} from "@db/models/departmentModel.js";
 export { logModel, type LogRow, type LogInput } from "@db/models/logModel.js";
 export {
   categoryModel,

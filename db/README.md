@@ -15,7 +15,7 @@ pnpm install
 pnpm db:up               # ยก postgres ด้วย docker compose
 pnpm db:generate         # สร้างไฟล์ migration จาก schema.ts
 pnpm db:migrate          # รัน migration ใส่ฐานข้อมูล
-pnpm db:seed             # ใส่ข้อมูลตัวอย่าง (--reset เพื่อล้างก่อน)
+pnpm db:seed             # ใส่ข้อมูลตัวอย่าง (--reset เพื่อล้างทุกตารางก่อน)
 ```
 
 > ถ้ารันทั้งระบบด้วย compose ที่ root ไม่ต้องทำขั้นตอนพวกนี้เอง —
@@ -44,7 +44,7 @@ db/
 ├── client.ts         คอนเนกชันและ dbClient
 ├── utils.ts          ประกอบ connection string จาก env + ตรวจว่าตั้งค่าครบ
 ├── migrate.ts        ตัวรัน migration
-├── seed.ts           ข้อมูลตัวอย่าง
+├── seed.ts           ข้อมูลตัวอย่าง: 2 แผนก, อุปกรณ์ 6 ชิ้น (รูปใน frontend/public/seed), คำขอครบทุกสถานะ + ประวัติ
 ├── prototype.ts      สคริปต์ไว้ลองเขียน query
 ├── migration/        ไฟล์ .sql ที่ drizzle-kit สร้าง (commit ไว้ในรีโป)
 └── models/
@@ -67,8 +67,10 @@ _entrypoint/init.sh   สร้าง app user + schema drizzle ตอน contai
 | `user_identities` | บัญชี OAuth ที่ผูกไว้ — คนเดียวผูกได้หลายผู้ให้บริการ |
 | `sessions` | session ที่ยังไม่หมดอายุ (คุกกี้เก็บแค่ token) |
 | `categories` | หมวดหมู่อุปกรณ์ |
-| `equipment` | อุปกรณ์และจำนวนทั้งหมดที่มี + หมวดหมู่ |
-| `borrows` | รายการยืม หนึ่งแถว = อุปกรณ์หนึ่งชิ้น + บันทึกว่าใครอนุมัติ/รับคืน |
+| `departments` | แผนก |
+| `staff_departments` | staff คนไหนดูแลแผนกไหน (คนหนึ่งดูแลได้หลายแผนก) |
+| `equipment` | อุปกรณ์และจำนวนทั้งหมดที่มี + หมวดหมู่ + แผนก |
+| `borrows` | รายการยืม หนึ่งแถว = อุปกรณ์หนึ่งชิ้น + ช่วงเวลายืม + บันทึกว่าใครอนุมัติ/ส่งมอบ/รับคืน |
 | `equipment_logs` | ประวัติการเปลี่ยนแปลงทั้งหมด ใครทำอะไรเมื่อไหร่ |
 
 ### ทำไมถึงเป็นแบบ "จำนวนรวม" ไม่ใช่ "รายชิ้น"
