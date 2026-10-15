@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import type { Equipment } from '../types'
 import StatusBadge from './StatusBadge'
 
@@ -11,7 +12,8 @@ type Props = {
 
 export default function EquipmentCard({ item, onBorrow, selected, onToggleSelect }: Props) {
   const isAvailable = item.available > 0
-  const selectable = isAvailable && onToggleSelect !== undefined
+  // ของหมดตอนนี้ก็ยังจองช่วงอื่นได้ ระบบตรวจตามช่วงเวลาที่ขอ
+  const selectable = item.quantity > 0 && onToggleSelect !== undefined
 
   return (
     <article className={`equipment-card ${selected ? 'equipment-card--selected' : ''}`}>
@@ -22,7 +24,9 @@ export default function EquipmentCard({ item, onBorrow, selected, onToggleSelect
       )}
 
       <header>
-        <strong>{item.name}</strong>
+        <strong>
+          <Link to={`/equipment/${encodeURIComponent(item.id)}`}>{item.name}</Link>
+        </strong>
         <StatusBadge status={isAvailable ? 'available' : 'borrowed'} />
       </header>
 

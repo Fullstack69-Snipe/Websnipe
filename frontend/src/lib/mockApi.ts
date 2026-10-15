@@ -36,17 +36,17 @@ let categories: Category[] = [
 ]
 
 let equipment: EquipmentRow[] = [
-  { id: 'e1', categoryId: 1, categoryName: null, name: 'กล้อง Canon EOS R50', description: 'พร้อมเลนส์คิท 18-45mm', imageUrl: 'https://picsum.photos/seed/camera/400/240', quantity: 2 },
-  { id: 'e2', categoryId: 2, categoryName: null, name: 'โน้ตบุ๊ก Dell Latitude 5450', description: 'i5 / RAM 16GB / SSD 512GB', imageUrl: 'https://picsum.photos/seed/laptop/400/240', quantity: 3 },
-  { id: 'e3', categoryId: 1, categoryName: null, name: 'ขาตั้งกล้อง Manfrotto', description: 'สูงสุด 160 cm พร้อมกระเป๋า', imageUrl: 'https://picsum.photos/seed/tripod/400/240', quantity: 4 },
-  { id: 'e4', categoryId: 3, categoryName: null, name: 'ไมค์ Rode Wireless GO II', description: 'ไมค์ไร้สาย 2 ตัว', imageUrl: null, quantity: 1 },
-  { id: 'e5', categoryId: 4, categoryName: null, name: 'โปรเจกเตอร์ Epson EB-X06', description: '3600 lumens พร้อมสาย HDMI', imageUrl: 'https://picsum.photos/seed/projector/400/240', quantity: 1 },
-  { id: 'e6', categoryId: 3, categoryName: null, name: 'ไฟ LED Godox SL60', description: 'พร้อมซอฟต์บ็อกซ์', imageUrl: 'https://picsum.photos/seed/light/400/240', quantity: 6 },
+  { id: 'e1', categoryId: 1, categoryName: null, departmentId: null, departmentName: null, name: 'กล้อง Canon EOS R50', description: 'กล้องมิเรอร์เลส 24MP พร้อมเลนส์ RF-S 18-45mm และแบตสำรอง 1 ก้อน', imageUrl: '/seed/canon-eos-r50.jpg', quantity: 2 },
+  { id: 'e2', categoryId: 2, categoryName: null, departmentId: null, departmentName: null, name: 'โน้ตบุ๊ก Dell Latitude 7490', description: 'Core i5 / RAM 16GB / SSD 512GB พร้อมสายชาร์จและเมาส์', imageUrl: '/seed/dell-latitude-7490.jpg', quantity: 3 },
+  { id: 'e3', categoryId: 1, categoryName: null, departmentId: null, departmentName: null, name: 'ขาตั้งกล้อง Manfrotto 190XB', description: 'สูงสุด 146 cm พร้อมหัวบอลและกระเป๋า', imageUrl: '/seed/manfrotto-190xb.jpg', quantity: 4 },
+  { id: 'e4', categoryId: 3, categoryName: null, departmentId: null, departmentName: null, name: 'ไมค์ไร้สาย Rode Wireless GO II', description: 'ตัวส่ง 2 ตัว + ตัวรับ 1 ตัว พร้อมขนกันลม', imageUrl: '/seed/rode-wireless-go-ii.jpg', quantity: 2 },
+  { id: 'e5', categoryId: 4, categoryName: null, departmentId: null, departmentName: null, name: 'โปรเจกเตอร์ Epson EB-U04', description: '3,000 lumens ความละเอียด WUXGA พร้อมสาย HDMI 5 เมตร', imageUrl: '/seed/epson-eb-u04.jpg', quantity: 1 },
+  { id: 'e6', categoryId: 1, categoryName: null, departmentId: null, departmentName: null, name: 'แฟลช Godox TT685 II', description: 'แฟลชหัวกล้อง TTL สำหรับกล้อง Sony พร้อมถ่านชาร์จ 4 ก้อน', imageUrl: '/seed/godox-tt685ii.jpg', quantity: 6 },
 ]
 
 let departments: Department[] = [
-  { id: 1, name: 'คณะวิศวกรรมศาสตร์', createdAt: dayjs().subtract(60, 'day').toISOString() },
-  { id: 2, name: 'คณะบริหารธุรกิจ', createdAt: dayjs().subtract(60, 'day').toISOString() },
+  { id: 1, name: 'คณะวิศวกรรมศาสตร์', createdAt: dayjs().subtract(60, 'day').toISOString(), staff: [], equipmentCount: 0 },
+  { id: 2, name: 'คณะบริหารธุรกิจ', createdAt: dayjs().subtract(60, 'day').toISOString(), staff: [], equipmentCount: 0 },
 ]
 
 // สร้างข้อมูลช่วงเวลายืมให้ครบรูปแบบเดียวกับที่ backend ส่งมา (ตาราง ws_borrow_details)
@@ -157,9 +157,39 @@ export const mockApi = {
     return equipment.map(withAvailable)
   },
 
+  qrImageUrl: () => '',
+
+  async equipmentBookings() {
+    await delay(0)
+    return []
+  },
+
+  async renameDepartment(id: number, name: string): Promise<Department> {
+    await delay()
+    departments = departments.map((d) => (d.id === id ? { ...d, name } : d))
+    return departments.find((d) => d.id === id)!
+  },
+
+  async deleteDepartment(id: number) {
+    await delay()
+    departments = departments.filter((d) => d.id !== id)
+    return { ok: true as const, unassigned: 0 }
+  },
+
+  async getEquipment(id: string): Promise<Equipment> {
+    await delay()
+    return findEquipment(id)
+  },
+
   async createEquipment(input: EquipmentInput): Promise<Equipment> {
     await delay()
-    const row: EquipmentRow = { ...input, id: crypto.randomUUID(), categoryName: null }
+    const row: EquipmentRow = {
+      ...input,
+      id: crypto.randomUUID(),
+      categoryName: null,
+      departmentId: null,
+      departmentName: null,
+    }
     equipment = [...equipment, row]
     return withAvailable(row)
   },
@@ -347,6 +377,8 @@ export const mockApi = {
       id: Math.max(0, ...departments.map((d) => d.id)) + 1,
       name: name.trim(),
       createdAt: new Date().toISOString(),
+      staff: [],
+      equipmentCount: 0,
     }
     departments = [...departments, dep]
     return dep
@@ -366,6 +398,14 @@ export const mockApi = {
   async assignStaffToDepartment(departmentId: number, userId: string) {
     await delay()
     return { userId, departmentId }
+  },
+
+  async removeStaffFromDepartment() {
+    await delay()
+  },
+
+  async unassignEquipmentFromDepartment() {
+    await delay()
   },
 
   // ===== ผู้ใช้ — ฝั่ง admin =====

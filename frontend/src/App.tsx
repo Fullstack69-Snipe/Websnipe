@@ -1,16 +1,19 @@
 import './App.css'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './lib/auth'
 import { FeedbackProvider } from './lib/feedback'
 import { useAuth } from './lib/useAuth'
 import Layout from './components/Layout'
 import SignIn from './pages/SignIn'
+import Home from './pages/Home'
 import EquipmentList from './pages/EquipmentList'
+import EquipmentDetail from './pages/EquipmentDetail'
 import MyBorrows from './pages/MyBorrows'
 import ManageEquipment from './pages/ManageEquipment'
 import BorrowRequests from './pages/BorrowRequests'
 import ManageCategories from './pages/ManageCategories'
 import ManageUsers from './pages/ManageUsers'
+import ManageDepartments from './pages/ManageDepartments'
 import type { Role } from './types'
 
 // ยังไม่ได้ login -> ไปหน้า sign-in
@@ -19,9 +22,14 @@ import type { Role } from './types'
 // นี่เป็นแค่การกันฝั่งหน้าจอ — สิทธิ์จริงตรวจที่ backend ทุก request
 function Guard({ allow, children }: { allow?: Role[]; children: React.ReactNode }) {
   const { user, role, loading } = useAuth()
+  const location = useLocation()
 
   if (loading) return <main className="container" aria-busy="true">กำลังตรวจสอบสิทธิ์...</main>
-  if (!user) return <Navigate to="/signin" replace />
+  if (!user) {
+    // จำหน้าไว้ เช่น สแกน QR ตอนยังไม่ login -> login เสร็จแล้วกลับมาหน้านี้
+    const next = location.pathname + location.search
+    return <Navigate to={`/signin?next=${encodeURIComponent(next)}`} replace />
+  }
   if (allow && role && !allow.includes(role)) return <Navigate to="/equipment" replace />
 
   return <>{children}</>
@@ -31,7 +39,7 @@ function Guard({ allow, children }: { allow?: Role[]; children: React.ReactNode 
 function SignInRoute() {
   const { user, loading } = useAuth()
   if (loading) return <main className="container" aria-busy="true">กำลังโหลด...</main>
-  return user ? <Navigate to="/equipment" replace /> : <SignIn />
+  return user ? <Navigate to="/" replace /> : <SignIn />
 }
 
 const STAFF: Role[] = ['staff', 'admin']
@@ -50,8 +58,9 @@ export default function App() {
               </Guard>
             }
           >
-            <Route index element={<Navigate to="/equipment" replace />} />
+            <Route index element={<Home />} />
             <Route path="/equipment" element={<EquipmentList />} />
+            <Route path="/equipment/:id" element={<EquipmentDetail />} />
             <Route path="/my-borrows" element={<MyBorrows />} />
 
             <Route
@@ -83,6 +92,14 @@ export default function App() {
               element={
                 <Guard allow={['admin']}>
                   <ManageUsers />
+                </Guard>
+              }
+            />
+            <Route
+              path="/admin/departments"
+              element={
+                <Guard allow={['admin']}>
+                  <ManageDepartments />
                 </Guard>
               }
             />

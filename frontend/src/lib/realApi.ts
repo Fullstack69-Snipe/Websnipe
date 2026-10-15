@@ -1,6 +1,6 @@
 import type {
   Equipment, EquipmentInput, Borrow, EquipmentLog,
-  Category, CategoryInput, User, Role, Department,
+  Category, CategoryInput, User, Role, Department, Booking,
 } from '../types'
 
 // ===================================================================
@@ -50,6 +50,14 @@ const send = <T>(method: string, path: string, body?: unknown) =>
 export const realApi = {
   // ===== อุปกรณ์ =====
   listEquipment: () => get<Equipment[]>('/equipment'),
+
+  getEquipment: (id: string) => get<Equipment>(`/equipment/${encodeURIComponent(id)}`),
+
+  equipmentBookings: (id: string) =>
+    get<Booking[]>(`/equipment/${encodeURIComponent(id)}/bookings`),
+
+  // รูป QR (svg) ของอุปกรณ์ — ใช้เป็น src ของ <img> ได้ตรง ๆ
+  qrImageUrl: (id: string) => `${BASE}/qr/equipment/${encodeURIComponent(id)}.svg`,
 
   createEquipment: (input: EquipmentInput) => send<Equipment>('POST', '/equipment', input),
 
@@ -106,6 +114,13 @@ export const realApi = {
 
   createDepartment: (name: string) => send<Department>('POST', '/departments', { name }),
 
+  renameDepartment: (id: number, name: string) =>
+    send<Department>('PUT', `/departments/${id}`, { name }),
+
+  // อุปกรณ์ในแผนกกลายเป็นไม่สังกัดแผนก (ไม่ถูกลบ)
+  deleteDepartment: (id: number) =>
+    send<{ ok: true; unassigned: number }>('DELETE', `/departments/${id}`),
+
   departmentEquipment: (departmentId: number) =>
     get<Equipment[]>(`/departments/${departmentId}/equipment`),
 
@@ -123,6 +138,13 @@ export const realApi = {
       `/departments/${departmentId}/staff/${userId}`,
     ),
 
+  removeStaffFromDepartment: (departmentId: number, userId: string) =>
+    send<void>('DELETE', `/departments/${departmentId}/staff/${userId}`),
+
+  // เอาอุปกรณ์ออกจากแผนก -> กลับเป็นไม่สังกัดแผนก
+  unassignEquipmentFromDepartment: (departmentId: number, equipmentId: string) =>
+    send<void>('DELETE', `/departments/${departmentId}/equipment/${equipmentId}`),
+
   // ===== ผู้ใช้ — ฝั่ง admin =====
   listUsers: () => get<User[]>('/users'),
 
@@ -132,7 +154,8 @@ export const realApi = {
   // ===== เพิ่มเติมจาก mockApi =====
 
   // ผู้ใช้ปัจจุบันจาก session — 401 ถ้ายังไม่ได้เข้าสู่ระบบ
-  me: () => get<User & { activeRole: Role }>('/me'),
+  // departmentIds = แผนกที่ staff คนนี้ดูแล (ใช้ซ่อนปุ่มจัดการอุปกรณ์นอกแผนก)
+  me: () => get<User & { activeRole: Role; departmentIds: number[] }>('/me'),
 
   // ช่องทาง login ที่เปิดใช้อยู่ (ตามที่ตั้ง env ไว้ฝั่ง backend)
   authProviders: () => get<{ providers: { name: string; label: string }[] }>('/auth/providers'),

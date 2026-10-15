@@ -2,25 +2,10 @@ import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import { api } from '../lib/api'
 import { useFeedback } from '../lib/useFeedback'
-import type { Borrow, BorrowStatus } from '../types'
+import { ACTIVE, formatPeriod, isPickedUp, needsPickup } from '../lib/borrow'
+import type { Borrow } from '../types'
 import StatusBadge from '../components/StatusBadge'
-
-// สถานะที่ถือว่า "ยังไม่จบ"
-const ACTIVE: BorrowStatus[] = ['pending', 'approved', 'returning']
-
-// อนุมัติแล้วแต่ยังไม่ได้ไปรับของ — รายการเก่าที่ไม่มี details ถือว่ารับแล้ว
-const needsPickup = (b: Borrow) =>
-  b.status === 'approved' && b.details !== null && b.details.pickedUpAt === null
-
-const isPickedUp = (b: Borrow) => b.details === null || b.details.pickedUpAt !== null
-
-function formatPeriod(b: Borrow) {
-  if (!b.details) return null
-  const start = dayjs(b.details.startAt)
-  const end = dayjs(b.details.endAt)
-  const sameYear = start.year() === end.year()
-  return `${start.format(sameYear ? 'D MMM' : 'D MMM YYYY')} – ${end.format('D MMM YYYY')}`
-}
+import BorrowSteps from '../components/BorrowSteps'
 
 export default function MyBorrows() {
   const { toast, confirm } = useFeedback()
@@ -76,6 +61,22 @@ export default function MyBorrows() {
     }
   }
 
+  async function handlePickup(id: string) {
+    const ok = await confirm({
+      title: 'ยืนยันรับของ',
+      message: 'ได้รับอุปกรณ์จากเจ้าหน้าที่แล้วใช่ไหม?',
+      confirmLabel: 'รับของแล้ว',
+    })
+    if (!ok) return
+    try {
+      await api.pickupBorrow(id)
+      toast('บันทึกการรับของแล้ว')
+      await load()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error')
+    }
+  }
+
   const active = borrows.filter((b) => ACTIVE.includes(b.status))
   const history = borrows.filter((b) => !ACTIVE.includes(b.status))
 
@@ -93,7 +94,12 @@ export default function MyBorrows() {
       {active.length === 0 ? (
         <article className="empty"><p>ยังไม่มีรายการยืม</p></article>
       ) : (
-        <BorrowTable rows={active} onReturn={handleReturn} onCancel={handleCancel} />
+        <BorrowTable
+          rows={active}
+          onReturn={handleReturn}
+          onCancel={handleCancel}
+          onPickup={handlePickup}
+        />
       )}
 
       <h2>ประวัติ ({history.length})</h2>
@@ -111,9 +117,10 @@ type TableProps = {
   rows: Borrow[]
   onReturn?: (id: string) => void
   onCancel?: (id: string) => void
+  onPickup?: (id: string) => void
 }
 
-function BorrowTable({ rows, onReturn, onCancel }: TableProps) {
+function BorrowTable({ rows, onReturn, onCancel, onPickup }: TableProps) {
   return (
     <div className="table-wrap">
       {/* borrow-table = กำหนดความกว้างคอลัมน์ตายตัว
@@ -135,6 +142,7 @@ function BorrowTable({ rows, onReturn, onCancel }: TableProps) {
               <tr key={b.id}>
                 <td>
                   {b.equipmentName}
+                  <BorrowSteps borrow={b} />
                   {b.rejectReason && (
                     <small className="muted-line">เหตุผลที่ปฏิเสธ: {b.rejectReason}</small>
                   )}
@@ -167,6 +175,11 @@ function BorrowTable({ rows, onReturn, onCancel }: TableProps) {
                         onClick={() => onCancel(b.id)}
                       >
                         ยกเลิกคำขอ
+                      </button>
+                    )}
+                    {needsPickup(b) && onPickup && (
+                      <button type="button" onClick={() => onPickup(b.id)}>
+                        รับของแล้ว
                       </button>
                     )}
                     {/* แจ้งคืนได้เฉพาะตอนรับของไปแล้ว — ยังไม่ได้รับจะคืนอะไร */}

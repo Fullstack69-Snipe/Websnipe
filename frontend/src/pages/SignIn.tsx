@@ -10,7 +10,10 @@ export default function SignIn() {
   const [loading, setLoading] = useState(true)
 
   // ?error=... มาจาก callback ตอนผู้ใช้กดยกเลิกหรือ state ไม่ตรง
-  const error = new URLSearchParams(window.location.search).get('error')
+  // ?next=... หน้าที่จะกลับไปหลัง login (backend ตรวจอีกรอบว่าเป็น path ในแอปนี้)
+  const search = new URLSearchParams(window.location.search)
+  const error = search.get('error')
+  const next = search.get('next')
 
   useEffect(() => {
     api
@@ -61,7 +64,7 @@ export default function SignIn() {
             key={p.name}
             role="button"
             className={`signin__btn signin__btn--${p.name}`}
-            href={`/api/auth/${p.name}`}
+            href={`/api/auth/${p.name}${next ? `?next=${encodeURIComponent(next)}` : ''}`}
           >
             <ProviderIcon provider={p.name} />
             เข้าสู่ระบบด้วย {p.label}

@@ -61,16 +61,22 @@ src/
 │
 ├── pages/
 │   ├── SignIn.tsx        ปุ่มเข้าสู่ระบบ (ขึ้นเฉพาะช่องทางที่ backend เปิดไว้)
-│   ├── EquipmentList.tsx รายการอุปกรณ์ + ค้นหา + ขอยืม
-│   ├── MyBorrows.tsx     การยืมของฉัน + แจ้งคืน
+│   ├── Home.tsx          หน้าแรก: เลือกแผนก -> ไปดูของในแผนกนั้น
+│   ├── EquipmentList.tsx รายการอุปกรณ์ + ค้นหา + กรองแผนก (?department=) + ขอยืม
+│   ├── EquipmentDetail.tsx หน้าอุปกรณ์ชิ้นเดียว (ปลายทางของ QR) — ขอยืม/รับของ/แจ้งคืนได้ในหน้า
+│   │                       staff ในแผนก: อนุมัติ/ส่งมอบ/รับคืน + พิมพ์ QR
+│   ├── MyBorrows.tsx     การยืมของฉัน + ยืนยันรับของ + แจ้งคืน
 │   ├── ManageEquipment.tsx  เพิ่ม/แก้/ลบอุปกรณ์ + ดูประวัติ (staff, admin)
 │   ├── ManageCategories.tsx จัดการหมวดหมู่                 (staff, admin)
 │   ├── BorrowRequests.tsx   อนุมัติ/ปฏิเสธ/รับคืน          (staff, admin)
-│   └── ManageUsers.tsx      ตั้งสิทธิ์ผู้ใช้                (admin)
+│   ├── ManageUsers.tsx      ตั้งสิทธิ์ผู้ใช้                (admin)
+│   └── ManageDepartments.tsx แผนก + staff/อุปกรณ์ในแผนก   (admin)
 │
 ├── components/
-│   ├── Layout.tsx        แถบนำทาง + เมนูผู้ใช้ + ปุ่มออกจากระบบ
+│   ├── Layout.tsx        แถบนำทาง (+ ตัวเลขงานค้าง) + เมนูผู้ใช้ + ปุ่มออกจากระบบ
 │   ├── EquipmentCard.tsx การ์ดอุปกรณ์ในหน้ารายการ
+│   ├── BorrowDialog.tsx  dialog ขอยืม (บอกช่วงที่ถูกจองแล้ว) ใช้ร่วมกันระหว่างหน้ารายการกับหน้าอุปกรณ์
+│   ├── BorrowSteps.tsx   แถบขั้นตอน ขอยืม → อนุมัติ → รับของ → คืนของ
 │   ├── EquipmentForm.tsx ฟอร์มเพิ่ม/แก้อุปกรณ์ (อัปโหลดรูปด้วย)
 │   ├── StatusBadge.tsx   ป้ายสถานะ
 │   └── ProviderIcon.tsx  โลโก้ Google / GitHub / Discord (SVG ฝังในไฟล์)
@@ -81,6 +87,7 @@ src/
     ├── mockApi.ts        ข้อมูลจำลองในหน่วยความจำ
     ├── auth.tsx          AuthProvider — ถาม /api/me ตอนเปิดแอป
     ├── useAuth.ts        hook อ่านผู้ใช้ปัจจุบัน
+    ├── borrow.ts         ตัวช่วยเรื่องสถานะการยืม (รอรับของ, รับแล้ว, ช่วงเวลา) ใช้ร่วมหลายหน้า
     └── labels.ts         คำแปลภาษาไทยของ status และ role
 ```
 
@@ -91,7 +98,8 @@ src/
 `AuthProvider` เรียก `/api/me` ครั้งเดียวตอนเปิดแอป
 
 - ได้ผู้ใช้กลับมา = มี session อยู่
-- ได้ 401 = ยังไม่ได้เข้าสู่ระบบ → `Guard` พาไปหน้า `/signin`
+- ได้ 401 = ยังไม่ได้เข้าสู่ระบบ → `Guard` พาไปหน้า `/signin?next=<หน้าเดิม>`
+  login เสร็จ backend พากลับหน้าเดิม (เช่น สแกน QR ตอนยังไม่ login)
 
 ตัวตนอยู่ในคุกกี้ `pf_session` ซึ่งเป็น httpOnly — JavaScript อ่านไม่ได้และไม่จำเป็นต้องอ่าน
 แค่ถูกแนบไปกับทุก request เอง

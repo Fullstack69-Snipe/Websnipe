@@ -1,21 +1,24 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { useFeedback } from '../lib/useFeedback'
-import type { Category, Equipment, EquipmentInput } from '../types'
+import type { Category, Department, Equipment, EquipmentInput } from '../types'
 
 type Props = {
   initial: Equipment | null // null = เพิ่มใหม่
   categories: Category[]
+  // ส่งมา = admin เลือกแผนกได้ / ไม่ส่ง = staff (ย้ายแผนกไม่ได้ ไม่โชว์ช่องนี้)
+  departments?: Department[]
   onSubmit: (input: EquipmentInput) => Promise<void>
   onClose: () => void
 }
 
-export default function EquipmentForm({ initial, categories, onSubmit, onClose }: Props) {
+export default function EquipmentForm({ initial, categories, departments, onSubmit, onClose }: Props) {
   const { toast } = useFeedback()
   const [name, setName] = useState(initial?.name ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [quantity, setQuantity] = useState(initial?.quantity ?? 1)
   const [imageUrl, setImageUrl] = useState<string | null>(initial?.imageUrl ?? null)
   const [categoryId, setCategoryId] = useState<number | null>(initial?.categoryId ?? null)
+  const [departmentId, setDepartmentId] = useState<number | null>(initial?.departmentId ?? null)
   const [saving, setSaving] = useState(false)
 
   // อ่านไฟล์รูปเป็น data URL — ตอนต่อ backend จริงค่อยเปลี่ยนเป็นอัปโหลดขึ้น Storage
@@ -40,6 +43,7 @@ export default function EquipmentForm({ initial, categories, onSubmit, onClose }
         quantity,
         imageUrl,
         categoryId,
+        ...(departments ? { departmentId } : {}),
       })
     } finally {
       setSaving(false)
@@ -92,6 +96,23 @@ export default function EquipmentForm({ initial, categories, onSubmit, onClose }
 
           </label>
 
+
+          {departments && (
+            <label>
+              แผนกที่ดูแล
+              <select
+                value={departmentId ?? ''}
+                onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">— ไม่สังกัดแผนก (เจ้าหน้าที่ทุกคนจัดการได้) —</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <label>
             จำนวนทั้งหมด

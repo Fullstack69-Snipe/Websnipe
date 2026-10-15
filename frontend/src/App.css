@@ -60,6 +60,9 @@ nav select {
   nav.container {
     flex-direction: column;
     align-items: stretch;
+    /* ต้องปิด wrap: แนวตั้งที่ wrap ได้ stretch จะยืดตามเมนูที่กว้างที่สุดแทนความกว้างจอ
+       แถวเมนูเลยกว้างเกินจอแล้วดันทั้งหน้าให้เลื่อนข้าง แทนที่จะเลื่อนในแถวตัวเอง */
+    flex-wrap: nowrap;
   }
   nav.container > ul:last-of-type {
     justify-content: flex-start;
@@ -76,16 +79,24 @@ nav select {
 /* ===== แถบค้นหา + filter ===== */
 .toolbar {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
   margin-bottom: 1.5rem;
 }
+/* จอแคบ: ช่องค้นหาเต็มแถว ตัวกรองตกลงไปแบ่งกันแถวล่าง แทนที่จะล้นจอ */
 .toolbar input {
-  flex: 1;
+  flex: 1 1 14rem;
   margin: 0;
 }
 .toolbar select {
   width: 12rem;
   margin: 0;
+}
+@media (max-width: 720px) {
+  .toolbar select {
+    flex: 1 1 8rem;
+    width: auto;
+  }
 }
 
 /* ===== การ์ดอุปกรณ์ ===== */
@@ -935,4 +946,240 @@ a.signin__btn {
   .equipment-card:hover img {
     transform: none;
   }
+}
+/* ---------- หน้าอุปกรณ์ชิ้นเดียว (ปลายทางของ QR) ---------- */
+.equipment-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 1.5rem;
+  border-radius: var(--ws-radius);
+  border: 1px solid var(--pico-muted-border-color);
+  box-shadow: var(--ws-shadow-sm);
+}
+.equipment-detail > img,
+.equipment-detail > .equipment-card__placeholder {
+  width: 100%;
+  aspect-ratio: 5 / 3;
+  object-fit: cover;
+  border-radius: var(--ws-radius);
+}
+.equipment-detail header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  background: none;
+  border: none;
+}
+.equipment-detail h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+@media (max-width: 720px) {
+  .equipment-detail {
+    grid-template-columns: 1fr;
+  }
+}
+
+.qr-card {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  border-radius: var(--ws-radius);
+  border: 1px solid var(--pico-muted-border-color);
+}
+.qr-card img {
+  flex: none;
+  background: #fff;
+  border-radius: 0.5rem;
+}
+.qr-card button {
+  width: auto;
+}
+
+/* กล่องรายการยืมของชิ้นนี้ (ของผู้ยืมเอง / ที่เจ้าหน้าที่ต้องจัดการ) */
+.detail-panel {
+  border-radius: var(--ws-radius);
+  border: 1px solid var(--pico-muted-border-color);
+}
+.detail-panel .table-wrap {
+  margin: 0;
+  border: none;
+  box-shadow: none;
+}
+.detail-borrow {
+  width: auto;
+  padding-inline: 2rem;
+}
+
+/* จอมือถือ (ที่สแกน QR / กดรับของ) — แต่ละรายการตัดเป็นหลายบรรทัดแทนตาราง
+   ไม่งั้นปุ่มอยู่คอลัมน์ขวาสุด ต้องเลื่อนตารางไปข้าง ๆ ถึงจะเจอ */
+@media (max-width: 720px) {
+  :is(.detail-panel, .borrow-table) table,
+  table.borrow-table {
+    min-width: 0;
+    table-layout: auto;
+  }
+  .borrow-table thead {
+    display: none;
+  }
+  :is(.detail-panel, .borrow-table) tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+    padding-block: 0.5rem;
+    border-block-end: 1px solid var(--pico-muted-border-color);
+  }
+  :is(.detail-panel, .borrow-table) td {
+    border: none;
+    padding: 0;
+  }
+  :is(.detail-panel td.col-actions, .borrow-table td:nth-child(5)) {
+    width: 100%;
+  }
+  :is(.detail-panel td.col-actions, .borrow-table td:nth-child(5)) .actions {
+    justify-content: flex-start;
+  }
+  /* การยืมของฉัน: ชื่ออุปกรณ์ขึ้นบรรทัดแรก วันที่ขอซ่อนไว้ (สำคัญน้อยสุด) แถวไม่มีปุ่มก็ไม่ต้องเว้นที่ */
+  .borrow-table td:first-child {
+    width: 100%;
+    font-weight: 600;
+  }
+  .borrow-table td:nth-child(2),
+  .borrow-table td:nth-child(5):not(:has(button)) {
+    display: none;
+  }
+}
+
+/* ---------- หน้าแผนก: แถวเลือก + ปุ่มเพิ่ม ---------- */
+.assign-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-block-end: 1.5rem;
+}
+.assign-row select {
+  margin: 0;
+}
+.assign-row button {
+  width: auto;
+  margin: 0;
+}
+
+/* พิมพ์ QR: เหลือแค่การ์ด QR ให้ตัดแปะของได้ */
+@media print {
+  nav,
+  main > p,
+  .equipment-detail,
+  .detail-panel,
+  .qr-card button,
+  .qr-card .muted,
+  .toasts {
+    display: none !important;
+  }
+  .qr-card {
+    border: none;
+    box-shadow: none;
+  }
+}
+
+/* ---------- หน้าแรก: การ์ดแผนก ---------- */
+.department-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+.department-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  border-radius: var(--ws-radius);
+  border: 1px solid var(--pico-muted-border-color);
+  background: var(--pico-card-background-color);
+  box-shadow: var(--ws-shadow-sm);
+  color: inherit;
+  text-decoration: none;
+  transition: transform var(--ws-ease), box-shadow var(--ws-ease), border-color var(--ws-ease);
+}
+.department-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--ws-shadow-md);
+  border-color: var(--pico-primary-border);
+}
+.department-card strong {
+  font-size: 1.15rem;
+  color: var(--pico-primary);
+}
+.department-card span {
+  display: flex;
+  flex-direction: column;
+  color: var(--pico-muted-color);
+}
+.department-card small.stock--empty {
+  color: #b9761a;
+}
+
+/* ---------- แถบขั้นตอนการยืม: ขอยืม -> อนุมัติ -> รับของ -> คืนของ ---------- */
+.borrow-steps {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.72rem;
+  color: var(--pico-muted-color);
+}
+.borrow-steps li {
+  flex: 1;
+  min-width: 3.2rem;
+  margin: 0;
+  padding-block-start: 0.35rem;
+  border-block-start: 3px solid var(--pico-muted-border-color);
+  white-space: nowrap;
+  list-style: none;
+}
+.borrow-steps li.is-done {
+  border-color: #2e7d5b;
+  color: #2e7d5b;
+}
+.borrow-steps li.is-current {
+  border-color: var(--pico-primary);
+  color: var(--pico-primary);
+  font-weight: 600;
+}
+
+/* ---------- ตัวเลขแจ้งเตือนข้างเมนู ---------- */
+.nav-badge {
+  display: inline-block;
+  min-width: 1.15rem;
+  margin-inline-start: 0.3rem;
+  padding: 0 0.35rem;
+  border-radius: 1rem;
+  background: #c0392b;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.15rem;
+  text-align: center;
+  vertical-align: 0.1rem;
+}
+
+/* ---------- หน้าต่างขอยืม: ช่วงที่เลือกว่างหรือเต็ม ---------- */
+.booking-info {
+  margin-block-end: 1rem;
+}
+.booking-info p {
+  margin-block-end: 0.25rem;
+}
+.availability {
+  font-weight: 600;
+}
+.availability--ok {
+  color: #2e7d5b;
+}
+.availability--full {
+  color: #c0392b;
 }

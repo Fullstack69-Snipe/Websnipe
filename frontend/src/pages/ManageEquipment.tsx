@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { useAuth } from '../lib/useAuth'
 import { useFeedback } from '../lib/useFeedback'
-import type { Category, Equipment, EquipmentInput } from '../types'
+import type { Category, Department, Equipment, EquipmentInput } from '../types'
 import EquipmentForm from '../components/EquipmentForm'
 import EquipmentHistory from '../components/EquipmentHistory'
 
@@ -10,6 +12,7 @@ type Editing = null | 'new' | Equipment
 
 export default function ManageEquipment() {
   const { toast, confirm } = useFeedback()
+  const { user, role } = useAuth()
   const [items, setItems] = useState<Equipment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -17,12 +20,18 @@ export default function ManageEquipment() {
   // อุปกรณ์ที่กำลังเปิดดูประวัติอยู่
   const [historyOf, setHistoryOf] = useState<Equipment | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
 
   async function load() {
     try {
-      const [eq, cats] = await Promise.all([api.listEquipment(), api.listCategories()])
+      const [eq, cats, deps] = await Promise.all([
+        api.listEquipment(),
+        api.listCategories(),
+        api.listDepartments(),
+      ])
       setItems(eq)
       setCategories(cats)
+      setDepartments(deps)
     } catch {
       setError('โหลดรายการอุปกรณ์ไม่สำเร็จ')
     } finally {
@@ -64,6 +73,12 @@ export default function ManageEquipment() {
       toast(err instanceof Error ? err.message : 'ลบไม่สำเร็จ', 'error')
     }
   }
+
+  // เหมือนที่ backend ตรวจ — ซ่อนปุ่มไว้ก่อนจะได้ไม่ต้องกดแล้วเจอ 403
+  const canManage = (item: Equipment) =>
+    role === 'admin' ||
+    item.departmentId === null ||
+    (user?.departmentIds ?? []).includes(item.departmentId)
 
   if (loading) return <p aria-busy="true">กำลังโหลด…</p>
   if (error) return <p className="error">{error}</p>
@@ -112,7 +127,17 @@ export default function ManageEquipment() {
                         <div className="thumb thumb--empty">ไม่มีรูป</div>
                       )}
                     </td>
-                    <td className="col-name"><strong>{item.name}</strong></td>
+                    {/* ชื่อพาไปหน้าอุปกรณ์ ซึ่งมี QR ให้พิมพ์ */}
+                    <td className="col-name">
+                      <strong>
+                        <Link to={`/equipment/${encodeURIComponent(item.id)}`} title="ดูหน้าอุปกรณ์ / พิมพ์ QR">
+                          {item.name}
+                        </Link>
+                      </strong>
+                      {item.departmentName && (
+                        <small className="muted-line">แผนก {item.departmentName}</small>
+                      )}
+                    </td>
                     <td className="muted col-nowrap">
                       {item.categoryName ?? '—'}
                     </td>
@@ -123,6 +148,8 @@ export default function ManageEquipment() {
                     </td>
                     <td className="col-actions">
                       <div className="actions">
+                        {canManage(item) ? (
+                          <>
                         <button type="button" className="outline" onClick={() => setEditing(item)}>
                           แก้ไข
                         </button>
@@ -142,6 +169,10 @@ export default function ManageEquipment() {
                         >
                           ลบ
                         </button>
+                          </>
+                        ) : (
+                          <small className="muted">แผนกอื่นดูแล</small>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -159,6 +190,7 @@ export default function ManageEquipment() {
       {editing && (
         <EquipmentForm
           categories={categories}
+          departments={role === 'admin' ? departments : undefined}
           // key ทำให้ฟอร์ม reset ทุกครั้งที่เปลี่ยนชิ้นที่แก้
           key={editing === 'new' ? 'new' : editing.id}
           initial={editing === 'new' ? null : editing}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import { api } from '../lib/api'
 import { useFeedback } from '../lib/useFeedback'
+import { formatPeriod, isHolding, isPickedUp, needsPickup } from '../lib/borrow'
 import type { Borrow } from '../types'
 import StatusBadge from '../components/StatusBadge'
 
@@ -15,24 +16,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'all', label: 'ทั้งหมด' },
 ]
 
-const isHolding = (b: Borrow) => b.status === 'approved' || b.status === 'returning'
 const isOverdue = (b: Borrow) => isHolding(b) && dayjs().isAfter(dayjs(b.dueDate), 'day')
-
-// อนุมัติแล้วแต่ผู้ยืมยังไม่มารับของ
-// รายการเก่าที่ไม่มี details ถือว่ารับไปแล้ว เพราะย้อนไปเช็คไม่ได้
-const needsPickup = (b: Borrow) =>
-  b.status === 'approved' && b.details !== null && b.details.pickedUpAt === null
-
-const isPickedUp = (b: Borrow) => b.details === null || b.details.pickedUpAt !== null
-
-// แสดงช่วงเวลายืมแบบสั้น — ถ้าปีเดียวกันไม่ต้องซ้ำปี
-function formatPeriod(b: Borrow) {
-  if (!b.details) return null
-  const start = dayjs(b.details.startAt)
-  const end = dayjs(b.details.endAt)
-  const sameYear = start.year() === end.year()
-  return `${start.format(sameYear ? 'D MMM' : 'D MMM YYYY')} – ${end.format('D MMM YYYY')}`
-}
 
 export default function BorrowRequests() {
   const { toast, confirm, prompt } = useFeedback()

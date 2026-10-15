@@ -37,10 +37,25 @@ export type Equipment = {
   available: number    // จำนวนที่เหลือให้ยืม (ระบบคำนวณให้ ไม่ได้เก็บใน DB)
   categoryId: number | null
   categoryName: string | null   // ระบบ join มาให้ ไม่ต้องส่งตอนบันทึก
+  // แผนกตั้งที่หน้าจัดการแผนก (admin) ไม่ได้ส่งมากับฟอร์มอุปกรณ์
+  departmentId: number | null
+  departmentName: string | null
 }
 
 // ข้อมูลที่ staff กรอกตอนเพิ่ม/แก้ไข (ไม่มี id เพราะระบบสร้าง / ไม่มี available เพราะระบบคำนวณ)
-export type EquipmentInput = Omit<Equipment, 'id' | 'available' | 'categoryName'>
+export type EquipmentInput = Omit<
+  Equipment,
+  'id' | 'available' | 'categoryName' | 'departmentId' | 'departmentName'
+> & {
+  // ตั้งได้เฉพาะ admin — ไม่ส่งมา = ไม่แตะแผนกเดิม
+  departmentId?: number | null
+}
+
+// ช่วงที่อุปกรณ์ถูกจองไว้แล้ว (อนุมัติแล้วยังไม่คืน) — null = รายการเก่าที่ไม่มีช่วงเวลา จองจนกว่าจะคืน
+export type Booking = {
+  startAt: string | null
+  endAt: string | null
+}
 
 export type Borrow = {
   id: string
@@ -103,4 +118,6 @@ export type Department = {
   id: number
   name: string
   createdAt: string
+  staff: { id: string; fullName: string; email: string }[]
+  equipmentCount: number
 }

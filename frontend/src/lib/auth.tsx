@@ -3,7 +3,7 @@ import { api } from './api'
 import { AuthContext } from './useAuth'
 import type { Role, User } from '../types'
 
-export type AuthUser = User & { avatarUrl?: string | null }
+export type AuthUser = User & { avatarUrl?: string | null; departmentIds?: number[] }
 
 export type AuthState = {
   user: AuthUser | null

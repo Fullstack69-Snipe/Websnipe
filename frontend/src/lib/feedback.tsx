@@ -22,6 +22,7 @@ type PromptOptions = DialogOptions & {
   label: string
   placeholder?: string
   multiline?: boolean
+  initialValue?: string
 }
 
 type Pending =
@@ -62,7 +63,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const prompt = useCallback((options: PromptOptions) => {
-    setDraft('')
+    setDraft(options.initialValue ?? '')
     return new Promise<string | null>((resolve) =>
       setPending({ ...options, input: true, resolve }),
     )

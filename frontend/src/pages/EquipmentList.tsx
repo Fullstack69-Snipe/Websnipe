@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
-import dayjs from 'dayjs'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
-import { useFeedback } from '../lib/useFeedback'
-import type { Category, Equipment, EquipmentStatus } from '../types'
+import type { Category, Department, Equipment, EquipmentStatus } from '../types'
 import EquipmentCard from '../components/EquipmentCard'
+import BorrowDialog from '../components/BorrowDialog'
 
 type Filter = 'all' | EquipmentStatus
 
 export default function EquipmentList() {
-  const { toast } = useFeedback()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [items, setItems] = useState<Equipment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -18,17 +18,15 @@ export default function EquipmentList() {
   // '' = ทุกหมวดหมู่ / 'none' = เฉพาะที่ไม่ระบุหมวด
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [categories, setCategories] = useState<Category[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
+  // แผนกอยู่ใน URL (?department=) เพราะหน้าแรกลิงก์มาที่แผนกตรง ๆ
+  // '' = ทุกแผนก / 'none' = เฉพาะที่ไม่สังกัดแผนก
+  const departmentFilter = searchParams.get('department') ?? ''
 
   // อุปกรณ์ที่ติ๊กเลือกไว้ — เก็บทั้ง object เพื่อโชว์ชื่อใน dialog ได้โดยไม่ต้องหาใหม่
   const [picked, setPicked] = useState<Equipment[]>([])
   // true = เปิด dialog ขอยืม (ยืมของที่ติ๊กไว้ทั้งหมด)
   const [borrowing, setBorrowing] = useState(false)
-  // ช่วงเวลายืม — เก็บเป็น 'YYYY-MM-DD' ให้ <input type="date"> ใช้ได้ตรง ๆ
-  const [startDate, setStartDate] = useState(dayjs().format('YYYY-MM-DD'))
-  const [dueDate, setDueDate] = useState(dayjs().add(7, 'day').format('YYYY-MM-DD'))
-  const [submitting, setSubmitting] = useState(false)
-  // เหตุผลที่ขอยืม — ไม่บังคับ แต่ช่วยให้เจ้าหน้าที่ตัดสินใจง่ายขึ้น
-  const [purpose, setPurpose] = useState('')
 
   // โหลดใหม่หลังขอยืม เพื่อให้จำนวนคงเหลือตรงกับของจริง
   async function reload() {
@@ -40,10 +38,11 @@ export default function EquipmentList() {
   }
 
   useEffect(() => {
-    Promise.all([api.listEquipment(), api.listCategories()])
-      .then(([eq, cats]) => {
+    Promise.all([api.listEquipment(), api.listCategories(), api.listDepartments()])
+      .then(([eq, cats, deps]) => {
         setItems(eq)
         setCategories(cats)
+        setDepartments(deps)
       })
       .catch(() => setError('โหลดรายการอุปกรณ์ไม่สำเร็จ'))
       .finally(() => setLoading(false))
@@ -59,7 +58,13 @@ export default function EquipmentList() {
         : categoryFilter === 'none'
           ? item.categoryId === null
           : item.categoryId === Number(categoryFilter)
-    return matchKeyword && matchStatus && matchCategory
+    const matchDepartment =
+      departmentFilter === ''
+        ? true
+        : departmentFilter === 'none'
+          ? item.departmentId === null
+          : item.departmentId === Number(departmentFilter)
+    return matchKeyword && matchStatus && matchCategory && matchDepartment
   })
 
   function toggleSelect(item: Equipment) {
@@ -70,54 +75,18 @@ export default function EquipmentList() {
     )
   }
 
-  async function handleBorrow() {
-    if (picked.length === 0) return
-    if (!dayjs(dueDate).isAfter(dayjs(startDate), 'day')) {
-      return toast('วันสิ้นสุดต้องอยู่หลังวันเริ่มต้น', 'error')
-    }
-
-    // backend ต้องการ ISO พร้อม timezone — ยืมทั้งวันตั้งแต่ 00:00 ถึง 23:59
-    const startAt = dayjs(startDate).startOf('day').format()
-    const endAt = dayjs(dueDate).endOf('day').format()
-    const note = purpose.trim() || undefined
-
-    setSubmitting(true)
-    try {
-      // backend ยังไม่มี endpoint ยืมหลายชิ้นในครั้งเดียว จึงยิงทีละชิ้น
-      // ใช้ allSettled เพราะถ้าชิ้นใดชิ้นหนึ่งพลาด (เช่น มีคนตัดหน้า) ชิ้นที่เหลือควรผ่านไปได้
-      const results = await Promise.allSettled(
-        picked.map((item) => api.requestBorrow(item.id, startAt, endAt, note)),
-      )
-
-      const failed = picked.filter((_, i) => results[i].status === 'rejected')
-      const okCount = picked.length - failed.length
-
-      if (okCount > 0) toast(`ส่งคำขอยืม ${okCount} ชิ้นเรียบร้อย รอเจ้าหน้าที่อนุมัติ`)
-      if (failed.length > 0) {
-        toast(`ขอยืมไม่สำเร็จ ${failed.length} ชิ้น: ${failed.map((f) => f.name).join(', ')}`, 'error')
-      }
-
-      // เหลือเฉพาะชิ้นที่ยังไม่สำเร็จไว้ให้ลองใหม่ ปิด dialog เมื่อผ่านครบ
-      setPicked(failed)
-      if (failed.length === 0) {
-        setBorrowing(false)
-        setPurpose('')
-      }
-      await reload()
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด', 'error')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   if (loading) return <p aria-busy="true">กำลังโหลดรายการอุปกรณ์…</p>
   if (error) return <p className="error">{error}</p>
+
+  const departmentName =
+    departmentFilter === 'none'
+      ? 'ไม่สังกัดแผนก'
+      : departments.find((d) => d.id === Number(departmentFilter))?.name
 
   return (
     <>
       <hgroup>
-        <h1>รายการอุปกรณ์</h1>
+        <h1>{departmentName ?? 'รายการอุปกรณ์'}</h1>
         <p>ติ๊กเลือกอุปกรณ์ที่ต้องการ จะเลือกหลายชิ้นพร้อมกันก็ได้ แล้วกดขอยืม</p>
       </hgroup>
 
@@ -128,6 +97,23 @@ export default function EquipmentList() {
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
         />
+        {departments.length > 0 && (
+          <select
+            value={departmentFilter}
+            aria-label="กรองตามแผนก"
+            onChange={(e) =>
+              setSearchParams(e.target.value ? { department: e.target.value } : {}, { replace: true })
+            }
+          >
+            <option value="">ทุกแผนก</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+            <option value="none">ไม่สังกัดแผนก</option>
+          </select>
+        )}
         <select
           value={categoryFilter}
           aria-label="กรองตามหมวดหมู่"
@@ -186,87 +172,19 @@ export default function EquipmentList() {
         </div>
       )}
 
-      <dialog open={borrowing}>
-        <article>
-          <header>
-            <strong>
-              ขอยืม {picked.length > 1 ? `${picked.length} ชิ้น` : picked[0]?.name}
-            </strong>
-          </header>
-
-          {picked.length > 1 && (
-            <ul className="pick-list">
-              {picked.map((p) => (
-                <li key={p.id}>
-                  <span>{p.name}</span>
-                  <button
-                    type="button"
-                    className="outline secondary"
-                    aria-label={`เอา ${p.name} ออก`}
-                    onClick={() => toggleSelect(p)}
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="date-range">
-            <label>
-              วันที่เริ่มยืม
-              <input
-                type="date"
-                value={startDate}
-                min={dayjs().format('YYYY-MM-DD')}
-                onChange={(e) => {
-                  setStartDate(e.target.value)
-                  // ถ้าวันเริ่มเลยวันคืนไปแล้ว ดันวันคืนตามให้อัตโนมัติ
-                  if (!dayjs(dueDate).isAfter(dayjs(e.target.value), 'day')) {
-                    setDueDate(dayjs(e.target.value).add(7, 'day').format('YYYY-MM-DD'))
-                  }
-                }}
-              />
-            </label>
-            <label>
-              วันที่ครบกำหนดคืน
-              <input
-                type="date"
-                value={dueDate}
-                min={dayjs(startDate).add(1, 'day').format('YYYY-MM-DD')}
-                onChange={(e) => setDueDate(e.target.value)}
-              />
-            </label>
-          </div>
-
-          <p className="range-summary">
-            ยืมทั้งหมด <strong>{dayjs(dueDate).diff(dayjs(startDate), 'day')}</strong> วัน
-          </p>
-
-          <label>
-            เหตุผลที่ขอยืม (ไม่บังคับ)
-            <textarea
-              rows={2}
-              value={purpose}
-              placeholder="เช่น ใช้ถ่ายงานสัมมนา"
-              onChange={(e) => setPurpose(e.target.value)}
-            />
-          </label>
-          <footer>
-            <button type="button" className="secondary" onClick={() => setBorrowing(false)}>
-              ยกเลิก
-            </button>
-            <button
-              type="button"
-              onClick={handleBorrow}
-              aria-busy={submitting}
-              disabled={picked.length === 0}
-            >
-              ยืนยันขอยืม{picked.length > 1 ? ` ${picked.length} ชิ้น` : ''}
-            </button>
-          </footer>
-        </article>
-      </dialog>
+      {borrowing && (
+        <BorrowDialog
+          items={picked}
+          onRemove={toggleSelect}
+          onClose={() => setBorrowing(false)}
+          onDone={(failed) => {
+            // เหลือเฉพาะชิ้นที่ยังไม่สำเร็จไว้ให้ลองใหม่ ปิด dialog เมื่อผ่านครบ
+            setPicked(failed)
+            if (failed.length === 0) setBorrowing(false)
+            void reload()
+          }}
+        />
+      )}
     </>
   )
 }
