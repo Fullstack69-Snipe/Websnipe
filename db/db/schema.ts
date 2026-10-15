@@ -332,6 +332,36 @@ export const equipmentLogsTable = pgTable(
   ],
 );
 
+// ---------- notifications ----------
+// แจ้งเตือนในเว็บ (กระดิ่งมุมขวาบน) — ส่งอีเมลซ้ำด้วยถ้าตั้งค่า SMTP ไว้
+// unique (user, borrow, type): เหตุการณ์เดียวกันของรายการเดียวกันแจ้งคนเดิมได้ครั้งเดียว
+// งานเตือนใกล้ครบกำหนด/เกินกำหนดที่รันซ้ำทุก 15 นาทีจึงไม่ส่งซ้ำ
+export const notificationsTable = pgTable(
+  "notifications",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    userId: varchar("user_id", { length: 64 })
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    borrowId: varchar("borrow_id", { length: 64 }).references(
+      () => borrowsTable.id,
+      { onDelete: "cascade" },
+    ),
+    type: varchar("type", { length: 40 }).notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    link: text("link"),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("notifications_once").on(table.userId, table.borrowId, table.type),
+    index("idx_notifications_user_created").on(table.userId, table.createdAt.desc()),
+  ],
+);
+
 // ---------- relations (สำหรับ dbClient.query.*.findMany({ with: ... })) ----------
 export const usersRelations = relations(usersTable, ({ many }) => ({
   borrows: many(borrowsTable),
@@ -413,4 +443,6 @@ export type Category = typeof categoriesTable.$inferSelect;
 export type NewCategory = typeof categoriesTable.$inferInsert;
 export type EquipmentLog = typeof equipmentLogsTable.$inferSelect;
 export type Department = typeof departmentsTable.$inferSelect;
+export type Notification = typeof notificationsTable.$inferSelect;
+export type NewNotification = typeof notificationsTable.$inferInsert;
 export type NewEquipmentLog = typeof equipmentLogsTable.$inferInsert;

@@ -38,8 +38,9 @@ POSTGRES_HOST=localhost pnpm dev
 BASE=http://localhost:6002/api node db/smoke-test.js
 ```
 
-104 เคส ครอบคลุมทุก endpoint, ทุกสิทธิ์, ข้อความ error, วงจรการยืมทั้งวงจร, ช่วงเวลายืม,
-การรับของ, สิทธิ์ตามแผนก, QR, การกลับหน้าเดิมหลัง login และกรณีกดพร้อมกัน (อนุมัติชิ้นสุดท้ายซ้อนกัน, ยกเลิกจังหวะเดียวกับอนุมัติ)
+122 เคส ครอบคลุมทุก endpoint, ทุกสิทธิ์, ข้อความ error, วงจรการยืมทั้งวงจร, ช่วงเวลายืม,
+การรับของ, สิทธิ์ตามแผนก, QR, แจ้งเตือน, การกลับหน้าเดิมหลัง login และกรณีกดพร้อมกัน (อนุมัติชิ้นสุดท้ายซ้อนกัน, ยกเลิกจังหวะเดียวกับอนุมัติ)
+(ไม่ได้ตั้งค่า OAuth จะข้าม 3 เคสที่เกี่ยวกับ login — GitHub Actions รันชุดนี้ทุก push ดู `.github/workflows/ci.yml`)
 สคริปต์สร้าง session ใส่ฐานข้อมูลโดยตรงเพื่อใช้ทดสอบ แล้วลบทิ้งเมื่อจบ
 (ไม่มีช่องทางลัดใดๆ ในตัว backend)
 
@@ -55,6 +56,7 @@ BASE=http://localhost:6002/api node db/smoke-test.js
 | --- | --- |
 | `GET /health` | ใช้กับ healthcheck ของ docker |
 | `GET /auth/providers` | ช่องทาง login ที่เปิดใช้อยู่ |
+| `GET /showcase` | path รูปอุปกรณ์ (สุ่ม ไม่เกิน 12) ให้หน้าเข้าสู่ระบบวนโชว์ — ไม่มีชื่อ/จำนวนของ |
 | `GET /auth/:provider?next=/path` | เด้งไปหน้า login ของผู้ให้บริการ แล้วกลับมาที่ `next` (รับเฉพาะ path ในแอป) |
 | `GET /auth/:provider/callback` | ผู้ให้บริการเรียกกลับมาที่นี่ |
 
@@ -82,6 +84,16 @@ BASE=http://localhost:6002/api node db/smoke-test.js
 | `POST /departments` · `PUT` / `DELETE /departments/:id` (แก้ชื่อ / ลบ) · `PUT` / `DELETE /departments/:id/equipment/:equipmentId` · `PUT` / `DELETE /departments/:id/staff/:userId` | admin |
 | `GET /qr/equipment/:id.svg` | ทุกคน — รูป QR ที่ลิงก์ไปหน้า `/equipment/:id` |
 | `GET /users` · `PUT /users/:id/role` | admin |
+| `GET /notifications` → `{ items, unread }` · `PUT /notifications/:id/read` · `PUT /notifications/read-all` | ทุกคน (เฉพาะของตัวเอง) |
+| `POST /notifications/reminders` → `{ sent }` | admin — สั่งรันงานเตือนครบกำหนดทันที (ปกติรันเองทุก 15 นาที) |
+
+### แจ้งเตือน
+
+สร้างตอนสถานะการยืมเปลี่ยน: มีคำขอใหม่ (ถึง staff ของแผนก), อนุมัติ, ปฏิเสธ, แจ้งคืน (ถึง staff), รับคืนแล้ว
+และงานเตือนทุก 15 นาที: ใกล้ครบกำหนด (เหลือไม่ถึง 24 ชม.) / เกินกำหนด (ถึงผู้ยืม + staff)
+แต่ละเหตุการณ์ส่งครั้งเดียว (unique `user_id, borrow_id, type`) งานเตือนจึงรันซ้ำได้
+staff ของแผนก = คนที่ดูแลแผนกของอุปกรณ์ชิ้นนั้น — อุปกรณ์ไม่สังกัดแผนกส่งถึง staff ทุกคน (ไม่มี staff เลยส่งถึง admin)
+ตั้ง `SMTP_HOST` แล้วจะส่งอีเมลด้วย (ไม่ตั้ง = แจ้งเตือนในเว็บอย่างเดียว) ส่งพลาดแค่เขียน log ไม่ทำให้คำขอล้ม
 
 ### อัปโหลดรูป
 
@@ -128,7 +140,7 @@ OAuth 2.0 authorization-code flow เขียนเองตรงๆ ไม่
 
 ```
 src/
-├── server.js               ประกอบ middleware ตามลำดับ + กวาด session หมดอายุวันละครั้ง
+├── server.js               ประกอบ middleware ตามลำดับ + กวาด session หมดอายุวันละครั้ง + งานเตือนทุก 15 นาที
 │
 ├── config/oauth.js         ตั้งค่าผู้ให้บริการ — เจ้าไหนไม่มี env ก็ปิดอัตโนมัติ
 │
@@ -140,6 +152,9 @@ src/
 ├── routes/                 ผูก path เข้ากับ controller + ระบุสิทธิ์ที่ต้องมี
 ├── controllers/            ตรวจ input, บังคับกติกาทางธุรกิจ, ตอบ JSON
 ├── models/                 ทางผ่านบางๆ ไปยังแพ็กเกจ db
+├── services/
+│   ├── notify.js           สร้างแจ้งเตือนตามเหตุการณ์ + งานเตือนครบกำหนด
+│   └── mailer.js           ส่งอีเมลผ่าน SMTP (ไม่ตั้ง SMTP_HOST = ปิด)
 └── utils/
     ├── HttpError.js        error ที่พ่วง status (badRequest, unauthorized, ...)
     └── wrap.js             ห่อ handler ให้ error ใน async วิ่งไป errorHandler
@@ -196,6 +211,8 @@ cors -> json -> cookieParser -> /uploads (static) -> /api/health
 | `ADMIN_EMAILS` | (ว่าง) | อีเมลที่ได้ admin อัตโนมัติ |
 | `SESSION_DAYS` | 30 | อายุ session |
 | `RUN_SEED` | — | `true` = ใส่ข้อมูลตัวอย่างตอนบูต (ข้ามถ้ามีข้อมูลแล้ว) |
+| `APP_URL` | — | ประกอบลิงก์ใน QR และในอีเมลแจ้งเตือน |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | (ว่าง) / 587 | อีเมลแจ้งเตือน — พอร์ต 465 ใช้ TLS ตรง (เช่น Gmail + App password) |
 
 ---
 
@@ -204,3 +221,5 @@ cors -> json -> cookieParser -> /uploads (static) -> /api/health
 - ไม่มี rate limit ที่ `/api/auth/*`
 - ไม่มี refresh token — session หมดอายุแล้วต้อง login ใหม่
 - ยังไม่มี endpoint สำหรับถอนการผูกบัญชี OAuth หรือลบผู้ใช้
+- ลบอุปกรณ์แล้วไฟล์รูปใน `UPLOAD_DIR` ยังค้างอยู่ (ไม่ได้ลบตาม)
+- งานเตือนรันใน process ของ backend — ถ้าวันหนึ่งรัน backend หลายตัวจะเช็คซ้ำ (ไม่ส่งซ้ำเพราะ unique แต่เปลืองแรง)

@@ -60,6 +60,12 @@ services:
       - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
       - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
       - SESSION_DAYS=${SESSION_DAYS}
+      # อีเมลแจ้งเตือน — ไม่ตั้ง SMTP_HOST = แจ้งเตือนในเว็บอย่างเดียว
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
       - ADMIN_EMAILS=${ADMIN_EMAILS}
       - CORS_ORIGINS=${CORS_ORIGINS}
     volumes:

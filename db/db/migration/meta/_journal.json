@@ -50,6 +50,13 @@
       "when": 1792076677084,
       "tag": "0006_tense_pride",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792091391111,
+      "tag": "0007_plain_maginty",
+      "breakpoints": true
     }
   ]
 }

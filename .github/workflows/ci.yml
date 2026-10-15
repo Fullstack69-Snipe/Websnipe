@@ -1,0 +1,55 @@
+# CI — ทุก push เข้า main และทุก PR
+#
+#   lint    oxlint ของ frontend
+#   system  build ทั้งระบบด้วย docker compose ตัวเดียวกับที่ใช้จริง แล้วรัน smoke test
+#           (build ของ db = tsc ตรวจ type, build ของ frontend = tsc -b + vite build
+#            ตอนบูต backend รัน migration + seed เอง จึงตรวจครบในขั้นเดียว)
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # เวอร์ชันเดียวกับ frontend/Dockerfile
+      - run: corepack enable && corepack prepare pnpm@11.9.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+
+  system:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ค่าตัวอย่างพอสำหรับเทสต์ — OAuth / SMTP ว่างไว้ (ปิดช่องทางนั้น)
+      - run: cp .env.example .env
+
+      - name: Build and start (db, backend, frontend)
+        run: docker compose up -d --build --wait --wait-timeout 300
+
+      - name: Frontend and API reachable through nginx
+        run: |
+          curl -fsS http://localhost:6002/ > /dev/null
+          curl -fsS http://localhost:6002/api/health
+
+      # รันใน container backend ที่มี db/dist และ env ต่อฐานข้อมูลครบอยู่แล้ว
+      - name: Smoke test
+        run: docker compose exec -T -w /app/backend -e BASE=http://localhost:3000/api backend node db/smoke-test.js
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - if: always()
+        run: docker compose down -v

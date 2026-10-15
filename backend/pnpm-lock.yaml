@@ -222,6 +222,9 @@ importers:
       multer:
         specifier: ^2.0.0
         version: 2.4.0
+      nodemailer:
+        specifier: ^10.1.1
+        version: 10.1.1
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
@@ -641,6 +644,10 @@ packages:
   node-abi@3.96.0:
     resolution: {integrity: sha512-rebQ/lz7i0EkoLzUVSrKRzA69zMkwLp95kKMWoMDkkM00Suxz0D7zEQPwRml5fQum24mj7bPvmlgLAmu2JCiYg==}
     engines: {node: '>=10'}
+
+  nodemailer@10.1.1:
+    resolution: {integrity: sha512-pbqZRoeYUO+1E8TJ/11WeY4D2EVujj1hsYjz3qff/vUFDtGnmi7p3iqzTFslYOfQ6PnjVcWxx/CIUSHCSrO/QA==}
+    engines: {node: '>=20.0.0'}
 
   object-assign@4.1.1:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
@@ -1238,6 +1245,8 @@ snapshots:
     dependencies:
       semver: 7.8.5
     optional: true
+
+  nodemailer@10.1.1: {}
 
   object-assign@4.1.1: {}
 

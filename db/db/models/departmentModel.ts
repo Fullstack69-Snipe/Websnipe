@@ -3,7 +3,7 @@
 // อุปกรณ์อยู่ได้แผนกเดียว (equipment.department_id) ไม่สังกัดแผนก = staff ทุกคนจัดการได้
 // staff หนึ่งคนดูแลได้หลายแผนก (staff_departments)
 
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, inArray } from "drizzle-orm";
 import { dbClient } from "@db/client.js";
 import {
   departmentsTable,
@@ -142,6 +142,37 @@ export const departmentModel = {
           eq(equipmentTable.departmentId, departmentId),
         ),
       );
+  },
+
+  /**
+   * ใครควรได้แจ้งเตือนเรื่องอุปกรณ์ชิ้นนี้ (คำขอใหม่ / แจ้งคืน / เกินกำหนด)
+   * อยู่ในแผนก -> staff ของแผนก / ไม่สังกัดแผนก -> staff ทุกคน (เพราะทุกคนจัดการได้)
+   * ไม่มี staff สักคน -> admin ทุกคน กันไม่ให้แจ้งเตือนหายเงียบ
+   */
+  async managersOf(equipmentId: string): Promise<string[]> {
+    const [item] = await dbClient
+      .select({ departmentId: equipmentTable.departmentId })
+      .from(equipmentTable)
+      .where(eq(equipmentTable.id, equipmentId))
+      .limit(1);
+
+    const staff =
+      item?.departmentId != null
+        ? await dbClient
+            .select({ id: staffDepartmentsTable.userId })
+            .from(staffDepartmentsTable)
+            .innerJoin(usersTable, eq(usersTable.id, staffDepartmentsTable.userId))
+            .where(
+              and(
+                eq(staffDepartmentsTable.departmentId, item.departmentId),
+                inArray(usersTable.role, ["staff", "admin"]),
+              ),
+            )
+        : await dbClient.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "staff"));
+    if (staff.length > 0) return staff.map((s) => s.id);
+
+    const admins = await dbClient.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin"));
+    return admins.map((a) => a.id);
   },
 
   /** แผนกที่ผู้ใช้คนนี้ดูแล */

@@ -1,5 +1,12 @@
 const { BorrowConflictError } = require('db');
 const { assertCanManage } = require('../middleware/identity');
+const {
+  onRequested,
+  onApproved,
+  onRejected,
+  onReturnRequested,
+  onReturned
+} = require('../services/notify');
 const borrowModel = require('../models/borrowModel');
 const equipmentModel = require('../models/equipmentModel');
 
@@ -130,6 +137,7 @@ const borrowController = {
       req.user
     );
 
+    await onRequested(borrow);
     res.status(201).json(borrow);
   },
 
@@ -221,8 +229,7 @@ const borrowController = {
       );
     }
 
-    res.json(
-      await transition(
+    const updated = await transition(
         borrowModel.setStatus(
           borrow.id,
           'returning',
@@ -231,8 +238,10 @@ const borrowController = {
             from: ['approved']
           }
         )
-      )
     );
+
+    await onReturnRequested(updated);
+    res.json(updated);
   },
 
   // =========================================
@@ -271,8 +280,7 @@ const borrowController = {
       throw conflict('ช่วงเวลาจองสิ้นสุดแล้ว');
     }
 
-    res.json(
-      await transition(
+    const updated = await transition(
         borrowModel.setStatus(
           borrow.id,
           'approved',
@@ -281,8 +289,10 @@ const borrowController = {
             from: ['pending']
           }
         )
-      )
     );
+
+    await onApproved(updated);
+    res.json(updated);
   },
 
   // PUT /api/borrows/:id/reject
@@ -309,8 +319,7 @@ const borrowController = {
         ? req.body.reason.trim() || null
         : null;
 
-    res.json(
-      await transition(
+    const updated = await transition(
         borrowModel.setStatus(
           borrow.id,
           'rejected',
@@ -320,8 +329,10 @@ const borrowController = {
             from: ['pending']
           }
         )
-      )
     );
+
+    await onRejected(updated);
+    res.json(updated);
   },
 
   // PUT /api/borrows/:id/pickup
@@ -378,8 +389,7 @@ const borrowController = {
         ? req.body.note.trim() || null
         : null;
 
-    res.json(
-      await transition(
+    const updated = await transition(
         borrowModel.markReturned(
           borrow.id,
           {
@@ -387,8 +397,10 @@ const borrowController = {
             note
           }
         )
-      )
     );
+
+    await onReturned(updated);
+    res.json(updated);
   }
 };
 

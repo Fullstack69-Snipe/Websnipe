@@ -388,6 +388,25 @@ const EQUIPMENT_KEYS =
     check('อุปกรณ์ที่ไม่มี -> 404', (await call('GET', '/equipment/nope/bookings')).status === 404);
   }
 
+  console.log('\n-- รูปหน้าเข้าสู่ระบบ (ไม่ต้อง login) --');
+  {
+    // ของสองชิ้นใช้รูปเดียวกัน -> ต้องไม่ได้ path ซ้ำ (หน้า login จะวนไปเจอรูปเดิม)
+    const { body: twin } = await call('GET', '/equipment/e1');
+    const { body: copy } = await call('POST', '/equipment', {
+      ...STAFF,
+      body: { name: 'รูปซ้ำ', description: '', imageUrl: twin.imageUrl, quantity: 1 }
+    });
+    const res = await fetch(`${BASE}/showcase`);
+    const body = await res.json();
+    await call('DELETE', `/equipment/${copy.id}`, STAFF);
+    check('ไม่มีรูปซ้ำ', new Set(body.photos).size === body.photos.length, JSON.stringify(body.photos));
+    check('ยังไม่ login ก็ดึงรูปได้', res.status === 200 && Array.isArray(body.photos));
+    check('ส่งแค่ path รูปในระบบ ไม่มีข้อมูลอื่น',
+      Object.keys(body).join(',') === 'photos' && body.photos.every((u) => typeof u === 'string' && u.startsWith('/')),
+      JSON.stringify(body).slice(0, 120));
+    check('ไม่เกิน 12 รูป', body.photos.length <= 12);
+  }
+
   console.log('\n-- QR --');
   {
     const res = await fetch(`${BASE}/qr/equipment/e3.svg`, { headers: { Cookie: cookies.user } });
@@ -420,6 +439,58 @@ const EQUIPMENT_KEYS =
   await call('PUT', `/borrows/${future}/confirm-return`, ADMIN);
   await call('DELETE', `/equipment/${booked.id}`, ADMIN);
   await dbConn`DELETE FROM departments WHERE id = ${departmentId}`;
+
+  console.log('\n-- แจ้งเตือน --');
+  {
+    const inbox = async (as) => (await call('GET', '/notifications', { as })).body;
+    const find = (box, borrowId, type) => box.items.find((n) => n.borrowId === borrowId && n.type === type);
+
+    // e3 อยู่แผนกที่ u2 (staff) ดูแล — คำขอใหม่ต้องไปถึง u2
+    const req = (await call('POST', '/borrows', { body: { equipmentId: 'e3', startAt: at(40), endAt: at(41), purpose: 'ทดสอบแจ้งเตือน' } })).body.id;
+    const staffNew = find(await inbox('staff'), req, 'request_new');
+    check('คำขอใหม่แจ้งเตือนเจ้าหน้าที่ของแผนก', !!staffNew && staffNew.link === '/manage/requests', JSON.stringify(staffNew));
+
+    await call('PUT', `/borrows/${req}/approve`, STAFF);
+    const approved = find(await inbox('user'), req, 'approved');
+    check('อนุมัติแล้วแจ้งเตือนผู้ยืม พร้อมลิงก์ไปหน้าอุปกรณ์', approved?.link === '/equipment/e3', JSON.stringify(approved));
+
+    await call('PUT', `/notifications/${approved.id}/read`, { as: 'user2' });
+    check('คนอื่นกดอ่านแจ้งเตือนของเราไม่ได้', find(await inbox('user'), req, 'approved').readAt === null);
+    await call('PUT', `/notifications/${approved.id}/read`);
+    check('กดอ่านแล้วมีเวลาที่อ่าน', find(await inbox('user'), req, 'approved').readAt !== null);
+
+    await call('PUT', `/borrows/${req}/request-return`);
+    check('แจ้งคืนแล้วแจ้งเตือนเจ้าหน้าที่', !!find(await inbox('staff'), req, 'return_requested'));
+    await call('PUT', `/borrows/${req}/confirm-return`, { ...STAFF, body: { note: 'ครบ' } });
+    check('รับคืนแล้วแจ้งเตือนผู้ยืม', !!find(await inbox('user'), req, 'returned'));
+
+    const rej = (await call('POST', '/borrows', { body: { equipmentId: 'e3', startAt: at(42), endAt: at(43) } })).body.id;
+    await call('PUT', `/borrows/${rej}/reject`, { ...STAFF, body: { reason: 'ช่วงนั้นปิดซ่อม' } });
+    check('ปฏิเสธแล้วแจ้งเตือนพร้อมเหตุผล', find(await inbox('user'), rej, 'rejected')?.body.includes('ช่วงนั้นปิดซ่อม'));
+
+    // ใกล้ครบกำหนด: ยืมวันนี้ คืนในอีก 12 ชม.
+    const soon = (await call('POST', '/borrows', { body: { equipmentId: 'e3', startAt: at(0), endAt: at(0.5) } })).body.id;
+    await call('PUT', `/borrows/${soon}/approve`, STAFF);
+    // เกินกำหนด: ย้อนวันในฐานข้อมูลตรง ๆ (ผ่าน API ขอย้อนหลังไม่ได้)
+    const late = (await call('POST', '/borrows', { body: { equipmentId: 'e3', startAt: at(0), endAt: at(2) } })).body.id;
+    await call('PUT', `/borrows/${late}/approve`, STAFF);
+    await dbConn`UPDATE borrows SET start_at = now() - interval '3 days', end_at = now() - interval '1 day' WHERE id = ${late}`;
+
+    check('สั่งตรวจเตือนได้เฉพาะ admin', (await call('POST', '/notifications/reminders', STAFF)).status === 403);
+    const run1 = await call('POST', '/notifications/reminders', { as: 'admin' });
+    const userBox = await inbox('user');
+    check('ใกล้ครบกำหนด -> เตือนผู้ยืม', !!find(userBox, soon, 'due_soon'));
+    check('เกินกำหนด -> เตือนผู้ยืม', !!find(userBox, late, 'overdue'));
+    check('เกินกำหนด -> เตือนเจ้าหน้าที่ด้วย', !!find(await inbox('staff'), late, 'overdue_staff'));
+    const run2 = await call('POST', '/notifications/reminders', { as: 'admin' });
+    check('ตรวจซ้ำไม่ส่งซ้ำ', run1.body.sent > 0 && run2.body.sent === 0, `${run1.body.sent} -> ${run2.body.sent}`);
+
+    await call('PUT', '/notifications/read-all');
+    check('อ่านทั้งหมดแล้วไม่เหลือที่ยังไม่อ่าน', (await inbox('user')).unread === 0);
+    check('ยังไม่ login ดูแจ้งเตือนไม่ได้', (await fetch(`${BASE}/notifications`)).status === 401);
+
+    for (const id of [soon, late]) await call('PUT', `/borrows/${id}/confirm-return`, STAFF);
+  }
 
   console.log('\n-- CRUD อุปกรณ์ --');
   {

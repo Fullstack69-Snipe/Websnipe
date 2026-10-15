@@ -6,7 +6,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 
-const { authModel } = require('db');
+const { authModel, equipmentModel } = require('db');
 const { attachIdentity } = require('./middleware/identity');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const { UPLOAD_DIR } = require('./middleware/upload');
@@ -16,6 +16,9 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const borrowRoutes = require('./routes/borrowRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
 const qrRoutes = require('./routes/qrRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const { notify } = require('./services/notify');
+const { mailEnabled } = require('./services/mailer');
 const userRoutes = require('./routes/userRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const authRoutes = require('./routes/authRoutes');
@@ -58,6 +61,20 @@ app.get('/api/health', (req, res) => {
 // login/logout ต้องเรียกได้ตอนยังไม่มีตัวตน จึงวางไว้ก่อน attachIdentity
 app.use('/api/auth', authRoutes);
 
+// รูปอุปกรณ์ให้หน้าเข้าสู่ระบบวนโชว์ — ยังไม่ login จึงส่งแค่ path รูป ไม่ส่งชื่อ/จำนวน
+// (ไฟล์ใน /uploads กับ /seed เปิดสาธารณะอยู่แล้ว) เอาเฉพาะรูปในระบบเอง ไม่ส่งลิงก์ภายนอกหรือ data:
+app.get('/api/showcase', wrap(async (req, res) => {
+  // ตัดรูปซ้ำ (ของรุ่นเดียวกันหลายแผนกใช้รูปเดียวกัน) ไม่งั้นหน้า login วนไปเจอรูปเดิมดูเหมือนไม่เปลี่ยน
+  const photos = [...new Set((await equipmentModel.listAll()).map((e) => e.imageUrl))]
+    .filter((url) => typeof url === 'string' && url.startsWith('/') && !url.startsWith('//'));
+  // สุ่มลำดับ (Fisher–Yates) ให้แต่ละรอบเห็นของไม่ซ้ำเดิม
+  for (let i = photos.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [photos[i], photos[j]] = [photos[j], photos[i]];
+  }
+  res.json({ photos: photos.slice(0, 12) });
+}));
+
 // ทุก route ใต้ /api ที่เหลือต้องผ่านการระบุตัวตนก่อน
 app.use('/api', wrap(attachIdentity));
 
@@ -67,6 +84,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/borrows', borrowRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/qr', qrRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/uploads', uploadRoutes);
 
@@ -85,8 +103,20 @@ const sweep = () =>
 setInterval(sweep, SWEEP_INTERVAL_MS).unref();
 sweep();
 
+// เตือนใกล้ครบกำหนด / เกินกำหนดทุก 15 นาที — แต่ละรายการเตือนครั้งเดียว (ไม่ส่งซ้ำ)
+const REMIND_INTERVAL_MS = 15 * 60 * 1000;
+const remind = () =>
+  notify
+    .reminders()
+    .then((n) => n > 0 && console.log(`ส่งแจ้งเตือนครบกำหนด ${n} รายการ`))
+    .catch((err) => console.error('ตรวจเตือนครบกำหนดไม่สำเร็จ:', err));
+
+setInterval(remind, REMIND_INTERVAL_MS).unref();
+remind();
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`pf-backend listening on http://0.0.0.0:${PORT}`);
   console.log(`database: postgres (ผ่านแพ็กเกจ db)`);
   console.log(`uploads : ${UPLOAD_DIR}`);
+  console.log(`email   : ${mailEnabled ? 'เปิด (SMTP)' : 'ปิด — แจ้งเตือนในเว็บอย่างเดียว'}`);
 });

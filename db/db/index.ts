@@ -53,6 +53,10 @@ export {
 } from "@db/models/departmentModel.js";
 export { logModel, type LogRow, type LogInput } from "@db/models/logModel.js";
 export {
+  notificationModel,
+  type NotificationRow,
+} from "@db/models/notificationModel.js";
+export {
   categoryModel,
   type CategoryRow,
   type CategoryInput,
