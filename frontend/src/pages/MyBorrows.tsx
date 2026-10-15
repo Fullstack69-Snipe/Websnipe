@@ -8,6 +8,20 @@ import StatusBadge from '../components/StatusBadge'
 // สถานะที่ถือว่า "ยังไม่จบ"
 const ACTIVE: BorrowStatus[] = ['pending', 'approved', 'returning']
 
+// อนุมัติแล้วแต่ยังไม่ได้ไปรับของ — รายการเก่าที่ไม่มี details ถือว่ารับแล้ว
+const needsPickup = (b: Borrow) =>
+  b.status === 'approved' && b.details !== null && b.details.pickedUpAt === null
+
+const isPickedUp = (b: Borrow) => b.details === null || b.details.pickedUpAt !== null
+
+function formatPeriod(b: Borrow) {
+  if (!b.details) return null
+  const start = dayjs(b.details.startAt)
+  const end = dayjs(b.details.endAt)
+  const sameYear = start.year() === end.year()
+  return `${start.format(sameYear ? 'D MMM' : 'D MMM YYYY')} – ${end.format('D MMM YYYY')}`
+}
+
 export default function MyBorrows() {
   const { toast, confirm } = useFeedback()
   const [borrows, setBorrows] = useState<Borrow[]>([])
@@ -102,12 +116,14 @@ type TableProps = {
 function BorrowTable({ rows, onReturn, onCancel }: TableProps) {
   return (
     <div className="table-wrap">
-      <table>
+      {/* borrow-table = กำหนดความกว้างคอลัมน์ตายตัว
+          เพราะหน้านี้มี 2 ตาราง ถ้าปล่อยให้คำนวณเองคอลัมน์จะไม่ตรงกัน */}
+      <table className="borrow-table">
         <thead>
           <tr>
             <th>อุปกรณ์</th>
             <th>วันที่ขอ</th>
-            <th>กำหนดคืน</th>
+            <th>ช่วงเวลายืม</th>
             <th>สถานะ</th>
             <th></th>
           </tr>
@@ -128,10 +144,20 @@ function BorrowTable({ rows, onReturn, onCancel }: TableProps) {
                 </td>
                 <td>{dayjs(b.createdAt).format('D MMM YYYY')}</td>
                 <td className={overdue ? 'overdue' : undefined}>
-                  {dayjs(b.dueDate).format('D MMM YYYY')}
-                  {overdue && ' — เกินกำหนด'}
+                  {formatPeriod(b) ?? dayjs(b.dueDate).format('D MMM YYYY')}
+                  {overdue && <small className="muted-line">เกินกำหนดแล้ว</small>}
                 </td>
-                <td><StatusBadge status={b.status} /></td>
+                <td>
+                  <StatusBadge status={b.status} />
+                  {needsPickup(b) && (
+                    <small className="muted-line">ติดต่อเจ้าหน้าที่เพื่อรับของ</small>
+                  )}
+                  {b.status === 'approved' && isPickedUp(b) && b.details && (
+                    <small className="muted-line">
+                      รับของแล้ว {dayjs(b.details.pickedUpAt).format('D MMM')}
+                    </small>
+                  )}
+                </td>
                 <td>
                   <div className="actions">
                     {b.status === 'pending' && onCancel && (
@@ -143,7 +169,8 @@ function BorrowTable({ rows, onReturn, onCancel }: TableProps) {
                         ยกเลิกคำขอ
                       </button>
                     )}
-                    {b.status === 'approved' && onReturn && (
+                    {/* แจ้งคืนได้เฉพาะตอนรับของไปแล้ว — ยังไม่ได้รับจะคืนอะไร */}
+                    {b.status === 'approved' && isPickedUp(b) && onReturn && (
                       <button type="button" className="outline" onClick={() => onReturn(b.id)}>
                         แจ้งคืน
                       </button>
