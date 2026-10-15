@@ -9,8 +9,8 @@ import { mockApi } from './mockApi'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
-// mockApi ไม่มี me() / uploadImage() จึง cast ให้ type ตรงกับ realApi
-// (ถ้าเปิดโหมด mock แล้วเรียกสองตัวนี้จะพังตอน runtime — ตั้งใจให้ใช้เฉพาะตอนต่อ backend จริง)
+// mockApi บางฟังก์ชันเป็นตัวจำลองแบบง่าย (type ไม่ตรงกับ realApi เป๊ะ) จึง cast ให้ตรงกัน
+// ฟังก์ชันที่ mock ไม่มีจะพังตอน runtime — โหมด mock มีไว้พัฒนาหน้าจอ ไม่ได้จำลองทุกอย่าง
 export const api: typeof realApi = USE_MOCK
   ? (mockApi as unknown as typeof realApi)
   : realApi

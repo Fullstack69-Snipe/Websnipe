@@ -1,10 +1,28 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- ติดตั้งเป็นแอปบนมือถือได้ (Add to Home Screen) — ไม่มี service worker จึงยังไม่ทำงานออฟไลน์ -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0172ad" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <!-- โหมดสว่าง/มืดที่ผู้ใช้เคยเลือก (ดู src/lib/theme.ts) — ใส่ก่อนวาดหน้า จะได้ไม่กะพริบ -->
+    <script>
+      try {
+        var t = localStorage.getItem('theme')
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t
+      } catch (e) {}
+    </script>
+    <!-- ฟอนต์ที่ตั้งไว้ใน index.css — ไม่โหลดตรงนี้ แต่ละเครื่องจะได้ฟอนต์ระบบคนละแบบ -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap"
+    />
+    <title>BORROW APP</title>
   </head>
   <body>
     <div id="root"></div>

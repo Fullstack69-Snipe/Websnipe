@@ -1,7 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
+import { Plus } from 'lucide-react'
 import { api } from '../lib/api'
 import { useFeedback } from '../lib/useFeedback'
 import type { Department, Equipment, User } from '../types'
+import DepartmentEquipment from '../components/DepartmentEquipment'
 
 // แผนก — admin เท่านั้น
 // staff จัดการได้เฉพาะอุปกรณ์ในแผนกที่ตัวเองดูแล และอุปกรณ์ที่ไม่สังกัดแผนก
@@ -18,7 +21,6 @@ export default function ManageDepartments() {
   // แผนกที่เปิดหน้าต่างจัดการอยู่ (เก็บ id เพราะข้อมูลแผนกโหลดใหม่หลังแก้ทุกครั้ง)
   const [openId, setOpenId] = useState<number | null>(null)
   const [staffToAdd, setStaffToAdd] = useState('')
-  const [equipmentToAdd, setEquipmentToAdd] = useState('')
 
   const load = () =>
     Promise.all([api.listDepartments(), api.listEquipment(), api.listUsers()])
@@ -107,9 +109,7 @@ export default function ManageDepartments() {
   if (loading) return <p aria-busy="true">กำลังโหลด...</p>
 
   const open = departments.find((d) => d.id === openId) ?? null
-  const inOpen = equipment.filter((e) => open && e.departmentId === open.id)
   const staffNotIn = staff.filter((u) => open && !open.staff.some((s) => s.id === u.id))
-  const equipmentNotIn = equipment.filter((e) => open && e.departmentId !== open.id)
 
   return (
     <section>
@@ -133,6 +133,7 @@ export default function ManageDepartments() {
         </label>
         <div className="actions">
           <button type="submit" aria-busy={saving}>
+            <Plus aria-hidden="true" />
             เพิ่มแผนก
           </button>
         </div>
@@ -169,6 +170,9 @@ export default function ManageDepartments() {
                     <button type="button" className="outline" onClick={() => void handleRename(d)}>
                       แก้ชื่อ
                     </button>
+                    <Link to={`/manage/qr?department=${d.id}`} role="button" className="outline">
+                      พิมพ์ QR
+                    </Link>
                     <button
                       type="button"
                       className="outline secondary"
@@ -184,7 +188,7 @@ export default function ManageDepartments() {
         </table>
       </div>
 
-      <dialog open={open !== null}>
+      <dialog open={open !== null} className="department-dialog">
         {open && (
           <article>
             <header>
@@ -239,57 +243,24 @@ export default function ManageDepartments() {
               </button>
             </div>
 
-            <h2>อุปกรณ์ ({inOpen.length})</h2>
-            {inOpen.length === 0 ? (
-              <p className="muted">ยังไม่มีอุปกรณ์ในแผนกนี้</p>
-            ) : (
-              <ul className="pick-list">
-                {inOpen.map((e) => (
-                  <li key={e.id}>
-                    <span>{e.name}</span>
-                    <button
-                      type="button"
-                      className="outline secondary"
-                      aria-label={`เอา ${e.name} ออกจากแผนก`}
-                      onClick={() =>
-                        void run(
-                          () => api.unassignEquipmentFromDepartment(open.id, e.id),
-                          `เอา "${e.name}" ออกจากแผนกแล้ว`,
-                        )
-                      }
-                    >
-                      ✕
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="assign-row">
-              <select
-                value={equipmentToAdd}
-                aria-label="เลือกอุปกรณ์"
-                onChange={(e) => setEquipmentToAdd(e.target.value)}
-              >
-                <option value="">เลือกอุปกรณ์…</option>
-                {equipmentNotIn.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name}
-                    {e.departmentName ? ` (ย้ายจาก ${e.departmentName})` : ''}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={!equipmentToAdd}
-                onClick={() => {
-                  const id = equipmentToAdd
-                  setEquipmentToAdd('')
-                  void run(() => api.assignEquipmentToDepartment(open.id, id), 'เพิ่มอุปกรณ์เข้าแผนกแล้ว')
-                }}
-              >
-                เพิ่ม
-              </button>
-            </div>
+            <h2>อุปกรณ์</h2>
+            <DepartmentEquipment
+              department={open}
+              equipment={equipment}
+              // shortcut: ยิงทีละชิ้นพร้อมกัน — ถ้าต้องย้ายทีละหลายร้อยชิ้นค่อยทำ endpoint แบบ bulk
+              onAssign={(ids) =>
+                run(
+                  () => Promise.all(ids.map((id) => api.assignEquipmentToDepartment(open.id, id))),
+                  `เพิ่ม ${ids.length} ชิ้นเข้าแผนก "${open.name}" แล้ว`,
+                )
+              }
+              onUnassign={(e) =>
+                void run(
+                  () => api.unassignEquipmentFromDepartment(open.id, e.id),
+                  `เอา "${e.name}" ออกจากแผนกแล้ว`,
+                )
+              }
+            />
 
             <footer>
               <button type="button" className="secondary" onClick={() => setOpenId(null)}>

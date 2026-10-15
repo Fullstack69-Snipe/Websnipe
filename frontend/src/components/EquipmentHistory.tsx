@@ -43,7 +43,7 @@ export default function EquipmentHistory({
               <li key={l.id}>
                 <div className="history__head">
                   <strong>{LOG_ACTION_LABEL[l.action]}</strong>
-                  <small>{dayjs(l.createdAt).format('D MMM YYYY HH:mm')}</small>
+                  <small>{dayjs(l.createdAt).format('D MMM BBBB HH:mm')}</small>
                 </div>
                 <small className="muted-line">โดย {l.actorName}</small>
                 {l.fromStatus && l.toStatus && (

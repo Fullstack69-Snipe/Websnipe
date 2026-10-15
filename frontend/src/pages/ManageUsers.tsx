@@ -3,6 +3,8 @@ import { api } from '../lib/api'
 import { useAuth } from '../lib/useAuth'
 import { useFeedback } from '../lib/useFeedback'
 import { ROLE_LABEL } from '../lib/labels'
+import { usePage } from '../lib/usePage'
+import Pagination from '../components/Pagination'
 import type { Role, User } from '../types'
 
 const ROLES: Role[] = ['user', 'staff', 'admin']
@@ -14,6 +16,7 @@ export default function ManageUsers() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [q, setQ] = useState('')
 
   const load = () =>
     api
@@ -49,6 +52,12 @@ export default function ManageUsers() {
     }
   }
 
+  const needle = q.trim().toLowerCase()
+  const filtered = users.filter(
+    (u) => u.fullName.toLowerCase().includes(needle) || u.email.toLowerCase().includes(needle),
+  )
+  const pg = usePage(filtered, needle)
+
   if (loading) return <p aria-busy="true">กำลังโหลด...</p>
 
   return (
@@ -60,6 +69,17 @@ export default function ManageUsers() {
 
       {error && <p className="error" role="alert">{error}</p>}
 
+      <div className="toolbar">
+        <input
+          type="search"
+          placeholder="ค้นหาชื่อหรืออีเมล"
+          aria-label="ค้นหาผู้ใช้"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <p className="muted">{filtered.length} คน</p>
+      </div>
+
       <div className="table-wrap">
         <table>
           <thead>
@@ -70,7 +90,7 @@ export default function ManageUsers() {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => {
+            {pg.rows.map((u) => {
               const isMe = u.id === me?.id
               return (
                 <tr key={u.id}>
@@ -81,6 +101,7 @@ export default function ManageUsers() {
                   <td>{u.email}</td>
                   <td>
                     <select
+                      className="role-select"
                       value={u.role}
                       aria-label={`สิทธิ์ของ ${u.fullName}`}
                       // กันเผลอถอดสิทธิ์ตัวเองจนไม่มี admin เหลือ
@@ -97,9 +118,17 @@ export default function ManageUsers() {
                 </tr>
               )
             })}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={3} className="muted">
+                  ไม่พบผู้ใช้ที่ตรงกับ "{q}"
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
+      <Pagination {...pg} />
     </section>
   )
 }

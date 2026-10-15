@@ -19,5 +19,5 @@ export function formatPeriod(b: Borrow) {
   const start = dayjs(b.details.startAt)
   const end = dayjs(b.details.endAt)
   const sameYear = start.year() === end.year()
-  return `${start.format(sameYear ? 'D MMM' : 'D MMM YYYY')} – ${end.format('D MMM YYYY')}`
+  return `${start.format(sameYear ? 'D MMM' : 'D MMM BBBB')} – ${end.format('D MMM BBBB')}`
 }

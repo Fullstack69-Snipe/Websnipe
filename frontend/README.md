@@ -64,19 +64,27 @@ src/
 │   ├── Home.tsx          หน้าแรก: เลือกแผนก -> ไปดูของในแผนกนั้น
 │   ├── EquipmentList.tsx รายการอุปกรณ์ + ค้นหา + กรองแผนก (?department=) + ขอยืม
 │   ├── EquipmentDetail.tsx หน้าอุปกรณ์ชิ้นเดียว (ปลายทางของ QR) — ขอยืม/รับของ/แจ้งคืนได้ในหน้า
+│   │                       + ปฏิทินวันว่าง (คลิกวันเพื่อขอยืมเริ่มวันนั้น)
 │   │                       staff ในแผนก: อนุมัติ/ส่งมอบ/รับคืน + พิมพ์ QR
 │   ├── MyBorrows.tsx     การยืมของฉัน + ยืนยันรับของ + แจ้งคืน
-│   ├── ManageEquipment.tsx  เพิ่ม/แก้/ลบอุปกรณ์ + ดูประวัติ (staff, admin)
+│   ├── ManageEquipment.tsx  เพิ่ม/แก้/ลบอุปกรณ์ + ค้นหา + ดูประวัติ (staff, admin)
+│   ├── QrLabels.tsx         พิมพ์ QR ทั้งแผนกเป็นแผ่น (?department=) (staff, admin)
+│   ├── Reports.tsx          รายงาน + ส่งออก CSV — staff เห็นเฉพาะแผนกตัวเอง (staff, admin)
 │   ├── ManageCategories.tsx จัดการหมวดหมู่                 (staff, admin)
 │   ├── BorrowRequests.tsx   อนุมัติ/ปฏิเสธ/รับคืน          (staff, admin)
-│   ├── ManageUsers.tsx      ตั้งสิทธิ์ผู้ใช้                (admin)
+│   ├── ManageUsers.tsx      ตั้งสิทธิ์ผู้ใช้ + ค้นหา          (admin)
 │   └── ManageDepartments.tsx แผนก + staff/อุปกรณ์ในแผนก   (admin)
 │
 ├── components/
 │   ├── Layout.tsx        แถบนำทาง (+ ตัวเลขงานค้าง) + เมนูผู้ใช้ + ปุ่มออกจากระบบ
+│   ├── NotificationBell.tsx กระดิ่งแจ้งเตือน (โหลดใหม่ทุกนาทีและทุกครั้งที่เปลี่ยนหน้า)
+│   ├── BookingCalendar.tsx  ปฏิทินว่าง/เหลือบางชิ้น/เต็ม รายวัน ในหน้าอุปกรณ์
+│   ├── Pagination.tsx    ปุ่มก่อนหน้า/ถัดไปใต้ตาราง (คู่กับ lib/usePage.ts)
 │   ├── EquipmentCard.tsx การ์ดอุปกรณ์ในหน้ารายการ
 │   ├── BorrowDialog.tsx  dialog ขอยืม (บอกช่วงที่ถูกจองแล้ว) ใช้ร่วมกันระหว่างหน้ารายการกับหน้าอุปกรณ์
 │   ├── BorrowSteps.tsx   แถบขั้นตอน ขอยืม → อนุมัติ → รับของ → คืนของ
+│   ├── BrandMark.tsx     โลโก้ + ชื่อ BORROW APP (หัวเว็บ / หน้าเข้าสู่ระบบ)
+│   ├── DepartmentEquipment.tsx ค้นหา + ติ๊กเพิ่มอุปกรณ์เข้าแผนกทีละหลายชิ้น
 │   ├── EquipmentForm.tsx ฟอร์มเพิ่ม/แก้อุปกรณ์ (อัปโหลดรูปด้วย)
 │   ├── StatusBadge.tsx   ป้ายสถานะ
 │   └── ProviderIcon.tsx  โลโก้ Google / GitHub / Discord (SVG ฝังในไฟล์)
@@ -87,7 +95,12 @@ src/
     ├── mockApi.ts        ข้อมูลจำลองในหน่วยความจำ
     ├── auth.tsx          AuthProvider — ถาม /api/me ตอนเปิดแอป
     ├── useAuth.ts        hook อ่านผู้ใช้ปัจจุบัน
+    ├── theme.ts          สลับโหมดสว่าง/มืด (จำไว้ใน localStorage)
     ├── borrow.ts         ตัวช่วยเรื่องสถานะการยืม (รอรับของ, รับแล้ว, ช่วงเวลา) ใช้ร่วมหลายหน้า
+    ├── booking.ts        ช่วงไหนถูกจองทับ — ตรรกะเดียวกับ overlapsSql ของ backend (dialog ขอยืม + ปฏิทิน)
+    ├── report.ts         ตัวเลขในหน้ารายงาน + สร้างไฟล์ CSV (มี BOM ให้ Excel อ่านภาษาไทยได้)
+    ├── usePage.ts        แบ่งรายการยาวเป็นหน้า (ในเบราว์เซอร์)
+    ├── image.ts          ย่อรูปก่อนอัปโหลด (ด้านยาวสุด 1600px, JPEG) — รูปจากมือถือจะได้ไม่เกิน 5MB
     └── labels.ts         คำแปลภาษาไทยของ status และ role
 ```
 
@@ -151,3 +164,8 @@ await api.createEquipment({ name, description, quantity, imageUrl: url })
 - เรียก API ด้วย `fetch` ล้วน ไม่ได้ใช้ไลบรารี HTTP ตัวอื่น
 - เรื่อง routing ให้ import จาก `react-router-dom` เท่านั้น อย่า import จาก
   `react-router` ตรงๆ เพราะจะได้คนละ instance กับที่ `react-router-dom` ใช้อยู่
+- วันที่ที่แสดงเป็นปี พ.ศ. (`format('D MMM BBBB')` ด้วย plugin buddhistEra) — แต่ค่าใน `<input type="date">`
+  และที่ส่งให้ backend ยังเป็น ค.ศ. `YYYY-MM-DD`
+- ติดตั้งเป็นแอปบนมือถือได้จาก `public/manifest.webmanifest` + ไอคอนใน `public/`
+  ถ้าเปลี่ยนโลโก้ (`favicon.svg`) ต้องสร้าง png ใหม่ทั้ง 4 ไฟล์ด้วย (192, 512, maskable 512, apple-touch 180)
+- กราฟในหน้ารายงานเป็น HTML/CSS ล้วน สีกราฟอยู่ที่ตัวแปร `--chart-1` ใน `App.css` (แยกค่าโหมดมืด)

@@ -1,78 +1,254 @@
 /* สไตล์ของหน้าจอและ component ทั้งหมด — import จาก App.tsx */
 
-/* ===== Navbar =====
-   staff/admin เห็นเมนูถึง 6 อัน + ชื่อผู้ใช้ + ปุ่มออกจากระบบ
-   ถ้าปล่อยตามค่าเริ่มต้นของ Pico (nowrap) เมนูจะล้นออกนอกจอบนโน้ตบุ๊ก */
-nav.container {
-  margin-bottom: 1.5rem;
+/* ===== หัวเว็บ =====
+   2 ชั้น: โลโก้ + ผู้ใช้ข้างบน / แถบเมนูมีไอคอนข้างล่าง (staff/admin มีเมนูถึง 8 อัน)
+   จอมือถือ: แถบเมนูย้ายไปติดล่างจอ (ดู media query ท้ายส่วนนี้) */
+/* สีแบรนด์ล็อกไว้ไม่ให้เปลี่ยนตามโหมด — โหมดมืดของ Pico ทำสีหลักให้สว่างจนแผง/โลโก้กลายเป็นฟ้าสด */
+:root {
+  --brand: #0172ad;
+  --brand-dark: #01426a;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  margin-bottom: 1.75rem;
+  background: var(--pico-background-color);
   border-bottom: 1px solid var(--pico-muted-border-color);
-  gap: 0.5rem 1rem;
-  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.04);
 }
-nav.container > ul {
-  flex-wrap: wrap;
-  row-gap: 0.15rem;
+.app-header__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.7rem;
 }
-nav.container > ul:last-of-type {
-  justify-content: flex-end;
+.brand-link {
+  color: inherit;
+  text-decoration: none;
 }
-nav strong {
-  font-size: 1.1rem;
+
+/* โลโก้: กล่องสีหลักมีไอคอนพัสดุ + ชื่อไทย/อังกฤษสองบรรทัด */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.brand__mark {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: none;
+  border-radius: 0.6rem;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand), var(--brand-dark));
+  box-shadow: 0 2px 6px rgb(1 66 106 / 0.35);
+}
+.brand__mark svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+.brand__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.brand__text strong {
+  font-size: 1.05rem;
+  letter-spacing: 0.05em;
   white-space: nowrap;
 }
-nav a.active {
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 0.4rem;
+.brand__text small {
+  font-size: 0.75rem;
+  color: var(--pico-muted-color);
 }
-nav a {
-  white-space: nowrap;
+.brand--lg .brand__mark {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
 }
-nav select {
-  width: auto;
-  margin: 0;
-  padding: 0.35rem 2rem 0.35rem 0.75rem;
-  font-size: 0.85rem;
+.brand--lg .brand__mark svg {
+  width: 1.7rem;
+  height: 1.7rem;
 }
-/* ชื่อยาว ๆ ไม่ให้ดันเมนูตกบรรทัด */
-.user-menu span {
+.brand--lg .brand__text strong {
+  font-size: 1.3rem;
+}
+
+/* ผู้ใช้ + ปุ่มออกจากระบบ */
+.user-menu__name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
   max-width: 14rem;
+  text-align: right;
+}
+.user-menu__name,
+.user-menu__name small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* จอโน้ตบุ๊ก — ย่อตัวอักษรกับระยะห่างแทนที่จะให้ล้น */
-@media (max-width: 1200px) {
-  nav.container :is(a, button, .user-menu) {
-    font-size: 0.875rem;
-  }
-  nav.container > ul > li {
-    padding-inline: 0.4rem;
-  }
-  nav.container button {
-    padding: 0.4rem 0.8rem;
-  }
+.user-menu__name small {
+  font-size: 0.75rem;
+}
+.avatar {
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+}
+.avatar--initial {
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  color: var(--pico-primary);
+  background: color-mix(in srgb, var(--pico-primary) 12%, transparent);
+}
+.theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: auto;
+  margin: 0 0 0 0.5rem;
+  padding: 0.4rem 0.55rem;
+}
+.theme-toggle svg {
+  width: 1rem;
+  height: 1rem;
+}
+.user-menu__logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: auto;
+  margin: 0 0 0 0.5rem;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+}
+.user-menu__logout svg {
+  width: 1rem;
+  height: 1rem;
 }
 
-/* จอเล็ก — แยกเป็น 2 แถว: ชื่อระบบข้างบน เมนูเลื่อนแนวนอนข้างล่าง */
+/* แถบเมนู — แท็บมีไอคอน ขีดเส้นใต้สีหลักตรงหน้าที่เปิดอยู่ */
+.app-nav {
+  display: block;
+  border-top: 1px solid var(--pico-muted-border-color);
+}
+.app-nav ul {
+  display: flex;
+  gap: 0.25rem;
+  margin-block: 0;
+  padding-block: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+/* Pico ใส่ padding: 0 และ margin ติดลบให้ nav ul ซึ่งทับระยะขอบของ .container
+   แถบเมนูเลยชิดขอบจอ ไม่ตรงแนวโลโก้ — ต้องเจาะจงกว่ากฎของ Pico (nav ul:first-of-type) */
+.app-nav > ul.container {
+  margin-inline: auto;
+  padding-inline: var(--pico-spacing);
+}
+/* เมนูแรกชิดแนวเดียวกับโลโก้ (หักระยะ padding ของลิงก์ออก) */
+.app-nav li:first-child a {
+  margin-inline-start: -0.85rem;
+}
+.app-nav li {
+  flex: none;
+  padding: 0;
+  list-style: none;
+}
+.app-nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  font-size: 0.9rem;
+  color: var(--pico-muted-color);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.app-nav a svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: none;
+}
+.app-nav a:hover {
+  color: var(--pico-primary);
+  background: color-mix(in srgb, var(--pico-primary) 5%, transparent);
+}
+.app-nav a.active {
+  color: var(--pico-primary);
+  border-bottom-color: var(--pico-primary);
+  font-weight: 600;
+}
+
+/* จอมือถือ — โลโก้ย่อเหลือแต่ไอคอน ชื่อผู้ใช้ซ่อน แถบเมนูไปติดล่างจอ (กดง่ายด้วยนิ้วโป้ง) */
 @media (max-width: 820px) {
-  nav.container {
+  .brand__text small,
+  .user-menu__name,
+  .user-menu__logout span {
+    display: none;
+  }
+  .user-menu__logout {
+    padding: 0.4rem 0.55rem;
+  }
+  .app-nav {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 60;
+    border-top: 1px solid var(--pico-muted-border-color);
+    background: var(--pico-background-color);
+    box-shadow: 0 -2px 10px rgb(0 0 0 / 0.08);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .app-nav ul {
+    padding-inline: 0.25rem;
+    gap: 0;
+  }
+  .app-nav li {
+    flex: 1 0 4.5rem;
+  }
+  .app-nav li:first-child a {
+    margin-inline-start: 0;
+  }
+  .app-nav a {
+    position: relative;
     flex-direction: column;
-    align-items: stretch;
-    /* ต้องปิด wrap: แนวตั้งที่ wrap ได้ stretch จะยืดตามเมนูที่กว้างที่สุดแทนความกว้างจอ
-       แถวเมนูเลยกว้างเกินจอแล้วดันทั้งหน้าให้เลื่อนข้าง แทนที่จะเลื่อนในแถวตัวเอง */
-    flex-wrap: nowrap;
+    gap: 0.15rem;
+    padding: 0.5rem 0.25rem 0.45rem;
+    border-bottom: none;
+    border-top: 2px solid transparent;
+    font-size: 0.68rem;
+    text-align: center;
   }
-  nav.container > ul:last-of-type {
-    justify-content: flex-start;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 0.25rem;
-    scrollbar-width: thin;
+  .app-nav a.active {
+    border-top-color: var(--pico-primary);
   }
-  nav.container > ul:last-of-type > li {
-    flex: none;
+  .app-nav a svg {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+  .app-nav .nav-badge {
+    position: absolute;
+    top: 0.2rem;
+    left: calc(50% + 0.35rem);
+    margin: 0;
+  }
+  /* เว้นที่ให้แถบเมนูด้านล่าง ไม่ให้บังเนื้อหา / แถบเลือกของ / toast */
+  body {
+    padding-bottom: 4.5rem;
+  }
+  .pick-bar {
+    bottom: 5rem !important;
+  }
+  .toasts {
+    bottom: 5.25rem !important;
   }
 }
 
@@ -259,7 +435,8 @@ td.overdue {
   margin: 0;
   align-self: center;
 }
-.toolbar > button {
+.toolbar > button,
+.toolbar > [role='button'] {
   width: auto;
   margin: 0;
 }
@@ -809,9 +986,19 @@ button:not(:disabled):active {
 }
 
 /* รูปย่อใหญ่ขึ้นให้สมดุลกับความสูงแถว และคอลัมน์รูปบีบให้พอดีรูป */
+/* สัดส่วน 5:3 เท่ารูปในการ์ดอุปกรณ์ — เดิม 72×48 เล็กจนดูไม่ออกว่าเป็นของอะไร */
 .thumb {
-  width: 72px;
-  height: 48px;
+  width: 120px;
+  height: 72px;
+  /* Pico ตั้ง img { max-width: 100% } — คอลัมน์รูปเป็น width: 1% เลยหดรูปเหลือเส้นเดียว */
+  max-width: none;
+}
+/* โน้ตบุ๊กจอเล็ก: ย่อรูปลงหน่อย ตารางจะได้ไม่ล้นจอ */
+@media (max-width: 1100px) {
+  .thumb {
+    width: 80px;
+    height: 48px;
+  }
 }
 /* ใช้ class เฉพาะ ห้ามใช้ th:first-child
    เพราะจะไปจับคอลัมน์แรกของ "ทุกตาราง" — เคยทำให้หน้าการยืมของฉันแตกตัวอักษรทีละตัว */
@@ -826,7 +1013,7 @@ button:not(:disabled):active {
 }
 
 /* =========================================================================
-   หน้าเข้าสู่ระบบ — หน้าแรกที่ทุกคนเห็น เลยจัดให้เต็มจอและอยู่กึ่งกลาง
+   หน้าเข้าสู่ระบบ — แบ่งครึ่งจอ: ซ้ายบอกว่าระบบคืออะไร / ขวาการ์ดเข้าสู่ระบบ
    (ทับกฎ .signin ใน index.css เพราะ App.css ถูก import ทีหลัง)
    ========================================================================= */
 .signin {
@@ -834,8 +1021,121 @@ button:not(:disabled):active {
   margin: 0;
   min-height: 100dvh;
   display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  background: var(--pico-background-color);
+}
+.signin > .signin__card {
+  align-self: center;
+  justify-self: center;
+  margin: 2rem 1.5rem;
+}
+
+.signin__brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.25rem;
+  /* Pico ใส่ margin-bottom ให้ทุก <section> — แผงจะสั้นกว่าจอ เห็นแถบพื้นหลังโผล่ข้างล่าง */
+  margin: 0;
+  padding: 3rem clamp(2rem, 5vw, 4.5rem);
+  color: #fff;
+  background:
+    radial-gradient(circle at 85% 10%, rgb(255 255 255 / 0.12), transparent 40%),
+    linear-gradient(160deg, var(--brand-dark), var(--brand) 60%, #0b5f8f);
+}
+.signin__brand h2 {
+  margin: 0.5rem 0 0;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  line-height: 1.25;
+  color: #fff;
+}
+.signin__brand > p {
+  margin: 0;
+  font-size: 1.05rem;
+  color: rgb(255 255 255 / 0.85);
+}
+/* โลโก้บนพื้นสีหลัก: กล่องเป็นขาว ชื่อเป็นขาว */
+.signin__brand .brand__mark {
+  color: var(--brand);
+  background: #fff;
+  box-shadow: none;
+}
+.signin__brand .brand__text small {
+  color: rgb(255 255 255 / 0.75);
+}
+
+.signin__features {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+.signin__features li {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin: 0;
+  list-style: none;
+  color: rgb(255 255 255 / 0.92);
+}
+.signin__features li span {
+  display: grid;
   place-items: center;
-  padding: 1.5rem;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: none;
+  border-radius: 0.6rem;
+  background: rgb(255 255 255 / 0.14);
+}
+.signin__features svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.signin__photos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+.signin__photos img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 0.6rem;
+  border: 2px solid rgb(255 255 255 / 0.35);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
+  animation: signin-photo-in 700ms ease;
+}
+@keyframes signin-photo-in {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+
+/* โลโก้ในการ์ด: แสดงเฉพาะจอแคบที่ไม่มีแผงซ้าย */
+.signin__logo-mobile {
+  display: none;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .signin {
+    grid-template-columns: 1fr;
+    place-items: center;
+    padding: 1.5rem;
+    background: color-mix(in srgb, var(--pico-primary) 6%, var(--pico-background-color));
+  }
+  .signin__brand {
+    display: none;
+  }
+  .signin > .signin__card {
+    margin: 0;
+  }
+  .signin__logo-mobile {
+    display: inline-block;
+  }
 }
 
 .signin__card {
@@ -855,17 +1155,6 @@ button:not(:disabled):active {
   text-align: center;
 }
 
-/* วงกลมไอคอนกล่องพัสดุ — สื่อความหมายของระบบตั้งแต่หน้าแรก */
-.signin__logo {
-  display: grid;
-  place-items: center;
-  width: 3.5rem;
-  height: 3.5rem;
-  margin: 0 auto 1rem;
-  border-radius: 50%;
-  color: var(--pico-primary);
-  background: color-mix(in srgb, var(--pico-primary) 14%, transparent);
-}
 
 .signin__head h1 {
   margin: 0 0 0.35rem;
@@ -1010,8 +1299,15 @@ a.signin__btn {
   box-shadow: none;
 }
 .detail-borrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   width: auto;
   padding-inline: 2rem;
+}
+.detail-borrow svg {
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 /* จอมือถือ (ที่สแกน QR / กดรับของ) — แต่ละรายการตัดเป็นหลายบรรทัดแทนตาราง
@@ -1070,8 +1366,8 @@ a.signin__btn {
 
 /* พิมพ์ QR: เหลือแค่การ์ด QR ให้ตัดแปะของได้ */
 @media print {
-  nav,
-  main > p,
+  .app-header,
+  .breadcrumb,
   .equipment-detail,
   .detail-panel,
   .qr-card button,
@@ -1085,17 +1381,83 @@ a.signin__btn {
   }
 }
 
-/* ---------- หน้าแรก: การ์ดแผนก ---------- */
+/* ---------- หน้าแรก ---------- */
+.home-welcome {
+  margin-bottom: 2rem;
+}
+.home-welcome hgroup p {
+  color: var(--pico-muted-color);
+}
+/* การ์ดตัวเลขเป็นลิงก์ไปหน้าการยืมของฉัน — ใช้หน้าตาเดียวกับ .stat ในหน้าคำขอยืม */
+a.home-stat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 0.9rem;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+  background: var(--pico-card-background-color);
+}
+/* เขียน .home-stat .home-stat__icon ให้เจาะจงกว่า .stat span ไม่งั้นสีไอคอนโดนทับเป็นสีเทา */
+.home-stat .home-stat__icon {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.7rem;
+  color: #0f7a6c;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.home-stat.stat--warn .home-stat__icon { color: #b9761a; }
+.home-stat.stat--pending .home-stat__icon { color: #6b7a8b; }
+.home-stat__icon svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+/* มือถือ: 3 ช่องเรียงแถวเดียว ไอคอนอยู่บนตัวเลข (ไม่งั้นแตกเป็น 2+1 ดูโหว่) */
+@media (max-width: 820px) {
+  .home-welcome .stats {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+  a.home-stat {
+    grid-template-columns: 1fr;
+    padding: 0.75rem;
+  }
+  .home-stat .home-stat__icon {
+    grid-row: auto;
+    width: 2rem;
+    height: 2rem;
+    margin-bottom: 0.4rem;
+  }
+  .home-stat strong {
+    font-size: 1.6rem;
+  }
+  .home-stat span {
+    font-size: 0.75rem;
+  }
+}
+
+/* หัวข้อส่วน: ชื่อ + คำอธิบายสั้น */
+.section-title {
+  margin-bottom: 1rem;
+}
+.section-title h2 {
+  margin-bottom: 0.2rem;
+}
+
+/* การ์ดแผนก: แถบรูปอุปกรณ์จริงด้านบน + ชื่อ + จำนวน */
 .department-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1.25rem;
 }
 .department-card {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 1.25rem;
+  overflow: hidden;
   border-radius: var(--ws-radius);
   border: 1px solid var(--pico-muted-border-color);
   background: var(--pico-card-background-color);
@@ -1109,16 +1471,64 @@ a.signin__btn {
   box-shadow: var(--ws-shadow-md);
   border-color: var(--pico-primary-border);
 }
-.department-card strong {
-  font-size: 1.15rem;
-  color: var(--pico-primary);
+.department-card__photos {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  /* แถวสูงเท่ากล่องเสมอ — ไม่งั้นการ์ดที่มีรูปเดียว แถวจะยืดตามความสูงรูปแล้วล้นทับตัวหนังสือ */
+  grid-auto-rows: 100%;
+  gap: 2px;
+  height: 7.5rem;
+  overflow: hidden;
+  background: var(--pico-muted-border-color);
 }
-.department-card span {
+.department-card__photos img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.department-card__empty {
+  display: grid;
+  place-items: center;
+  color: var(--pico-muted-color);
+  background: var(--pico-code-background-color);
+}
+.department-card__empty svg {
+  width: 2rem;
+  height: 2rem;
+}
+.department-card__body {
   display: flex;
   flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem 1.15rem 1.15rem;
+}
+.department-card__body strong {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  color: var(--pico-primary);
+}
+.department-card__body strong svg,
+.department-card__meta svg {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+}
+.department-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  font-size: 0.85rem;
   color: var(--pico-muted-color);
 }
-.department-card small.stock--empty {
+.department-card__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.department-card__meta .stock--empty {
   color: #b9761a;
 }
 
@@ -1182,4 +1592,744 @@ a.signin__btn {
 }
 .availability--full {
   color: #c0392b;
+}
+
+/* =========================================================================
+   ไอคอนและรายละเอียดของการ์ด / หน้าอุปกรณ์
+   ========================================================================= */
+
+/* ชิปหมวดหมู่ / แผนก — เดิมเป็น <p> ที่โดน flex:1 ยืดเต็มแถว ตอนนี้เป็นกลุ่มชิปพอดีข้อความ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.chip svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  flex: none;
+}
+.equipment-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0 1rem;
+  margin: 0.15rem 0 0.35rem;
+}
+/* คำอธิบายไม่เกิน 2 บรรทัด การ์ดในแถวเดียวกันจะสูงเท่ากัน */
+.equipment-card__desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.9rem;
+  color: var(--pico-muted-color);
+}
+.stock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.stock svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+/* เส้นทางนำทางบนหน้าอุปกรณ์: หน้าแรก › แผนก › ชื่อของ */
+.breadcrumb {
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+.breadcrumb ul {
+  padding: 0;
+}
+.breadcrumb li:last-child {
+  color: var(--pico-muted-color);
+}
+
+.equipment-detail__desc {
+  font-size: 1.02rem;
+}
+/* ข้อมูลสรุปของอุปกรณ์ — ป้ายเล็กมีไอคอน ค่าอยู่ข้างล่าง */
+.detail-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+}
+.detail-facts > div {
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.6rem;
+  background: var(--pico-code-background-color);
+}
+.detail-facts dt {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--pico-muted-color);
+}
+.detail-facts dt svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.detail-facts dd {
+  margin: 0.15rem 0 0;
+  font-weight: 600;
+}
+.detail-facts dd.stock {
+  display: block;
+  font-size: 1rem;
+  color: inherit;
+}
+
+/* หัวกล่องในหน้าอุปกรณ์ / การ์ด QR มีไอคอนนำหน้า */
+.detail-panel header strong,
+.qr-card strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.detail-panel header svg,
+.qr-card strong svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--pico-primary);
+}
+.qr-card button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.qr-card button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* =========================================================================
+   หน้าแผนก: หน้าต่างจัดการอุปกรณ์ของแผนก (ซ้าย ในแผนก / ขวา ค้นหาแล้วติ๊กเพิ่ม)
+   ========================================================================= */
+.department-dialog > article {
+  width: min(56rem, 100%);
+  max-width: none;
+}
+.dept-equipment {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+}
+.dept-equipment section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+  margin: 0;
+}
+.dept-equipment header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+}
+/* ปุ่ม "เลือกทั้งหมดที่แสดง" หน้าตาเป็นลิงก์ ไม่แย่งความสนใจจากปุ่มเพิ่ม */
+.dept-link {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--pico-primary);
+  font-size: 0.85rem;
+  text-decoration: underline;
+}
+input.dept-search {
+  margin: 0;
+}
+/* รายการเลื่อนในกรอบ — ของเยอะแค่ไหนหน้าต่างก็ไม่ยาวเกินจอ */
+.dept-list {
+  height: 20rem;
+  margin: 0;
+  padding: 0.25rem;
+  overflow-y: auto;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 0.6rem;
+  background: var(--pico-background-color);
+}
+.dept-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.45rem;
+  list-style: none;
+}
+.dept-list li:hover {
+  background: var(--pico-code-background-color);
+}
+.dept-list__empty {
+  justify-content: center;
+  padding: 2rem 0.5rem !important;
+  color: var(--pico-muted-color);
+}
+.dept-list__pick {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+.dept-list__pick input {
+  flex: none;
+  margin: 0;
+}
+.dept-list__thumb {
+  flex: none;
+  width: 3rem;
+  height: 2rem;
+  object-fit: cover;
+  border-radius: 0.3rem;
+}
+.dept-list__thumb--empty {
+  display: grid;
+  place-items: center;
+  color: var(--pico-muted-color);
+  background: var(--pico-code-background-color);
+}
+.dept-list__thumb--empty svg {
+  width: 1rem;
+  height: 1rem;
+}
+.dept-list__name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+.dept-list__name small {
+  font-size: 0.75rem;
+  color: var(--pico-muted-color);
+}
+.dept-list__remove {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: auto;
+  margin: 0;
+  padding: 0.25rem;
+}
+.dept-list__remove svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+.dept-add {
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .dept-equipment {
+    grid-template-columns: 1fr;
+  }
+  .dept-list {
+    height: 14rem;
+  }
+}
+
+/* =========================================================================
+   กระดิ่งแจ้งเตือนบนหัวเว็บ
+   ========================================================================= */
+.notif {
+  position: relative;
+  margin-left: 0.5rem;
+}
+.notif__button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: auto;
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+}
+.notif__button svg {
+  width: 1rem;
+  height: 1rem;
+}
+.notif__badge {
+  position: absolute;
+  top: -0.45rem;
+  right: -0.5rem;
+  margin: 0;
+}
+.notif__panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 100;
+  width: min(24rem, 92vw);
+  max-height: min(28rem, 70vh);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--ws-radius);
+  background: var(--pico-card-background-color);
+  box-shadow: var(--ws-shadow-md);
+}
+.notif__panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+.notif__panel ul {
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+.notif__panel li {
+  margin: 0;
+  list-style: none;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+.notif__panel li:last-child {
+  border-bottom: none;
+}
+.notif__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.7rem 1rem 0.7rem 1.6rem;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  position: relative;
+}
+.notif__item:hover {
+  background: var(--pico-code-background-color);
+}
+.notif__item span {
+  color: var(--pico-muted-color);
+}
+.notif__item small {
+  font-size: 0.72rem;
+  color: var(--pico-muted-color);
+}
+/* จุดสีหน้ารายการที่ยังไม่อ่าน */
+.notif__item--unread::before {
+  content: '';
+  position: absolute;
+  left: 0.65rem;
+  top: 1.05rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--pico-primary);
+}
+.notif__empty {
+  margin: 0;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--pico-muted-color);
+}
+@media (max-width: 820px) {
+  .notif {
+    position: static;
+  }
+  .notif__panel {
+    right: 0.75rem;
+    left: 0.75rem;
+    width: auto;
+  }
+}
+
+/* ปฏิทินการจองในหน้าอุปกรณ์ */
+.booking-cal header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.booking-cal__nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.booking-cal__nav span {
+  min-width: 9rem;
+  text-align: center;
+  font-weight: 600;
+}
+.booking-cal__nav button {
+  width: auto;
+  margin: 0;
+  padding: 0.3rem 0.45rem;
+  line-height: 0;
+}
+.booking-cal__nav svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.booking-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.3rem;
+  max-width: 34rem;
+}
+.booking-cal__wd {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--pico-muted-color);
+}
+.booking-cal__day {
+  margin: 0;
+  padding: 0.45rem 0;
+  border-radius: 0.4rem;
+  font-size: 0.9rem;
+  color: var(--pico-contrast);
+  border: 1px solid transparent;
+}
+.booking-cal__day--free {
+  background: color-mix(in srgb, #2e9e5b 16%, transparent);
+}
+.booking-cal__day--partial {
+  background: color-mix(in srgb, #d99a00 22%, transparent);
+}
+.booking-cal__day--full {
+  background: color-mix(in srgb, #c62828 18%, transparent);
+}
+.booking-cal__day--past {
+  background: transparent;
+  color: var(--pico-muted-color);
+}
+.booking-cal__day:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.booking-cal__day--full:disabled {
+  text-decoration: line-through;
+}
+.booking-cal__day:not(:disabled):hover {
+  border-color: var(--brand);
+}
+.booking-cal__day.is-today {
+  border-color: var(--brand);
+  font-weight: 700;
+}
+.booking-cal__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  font-size: 0.85rem;
+}
+.booking-cal__legend li {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+}
+.booking-cal__legend i {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 0.25rem;
+}
+@media print {
+  .booking-cal {
+    display: none !important;
+  }
+}
+
+/* ปุ่มที่มีไอคอนนำหน้า — button ใช้ specificity ต่ำให้ class เฉพาะทับได้
+   ส่วนลิงก์ต้องชนะ [role=button] ของ Pico ที่ตั้ง display: inline-block */
+button:where(:has(> svg)),
+a[role='button']:has(> svg) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+button:where(:has(> svg)) > svg,
+a:where([role='button']) > svg {
+  width: 1.05em;
+  height: 1.05em;
+  flex: none;
+}
+.empty > svg {
+  width: 2rem;
+  height: 2rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.6;
+}
+
+/* แผ่นสติกเกอร์ QR (หน้าพิมพ์ QR ทั้งแผนก) */
+.qr-sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  gap: 0.75rem;
+  padding: 0;
+  margin: 0;
+}
+.qr-label {
+  list-style: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+  border: 1px dashed var(--pico-muted-border-color);
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #111;
+  break-inside: avoid;
+}
+.qr-label img {
+  width: 120px;
+  height: 120px;
+}
+.qr-label strong {
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+.qr-label small {
+  font-size: 0.7rem;
+  color: #555;
+}
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  /* A4: 4 ดวงต่อแถว ตัดตามเส้นประ */
+  .qr-sheet {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+  }
+  .qr-label {
+    border-color: #999;
+    border-radius: 0;
+  }
+}
+
+/* =========================================================================
+   หน้ารายงาน — กราฟทำด้วย HTML/CSS ล้วน ไม่ใช้ไลบรารี
+   สีกราฟชุดเดียว ตรวจกับพื้นหลังทั้งสองโหมดแล้ว (dataviz validate_palette)
+   ========================================================================= */
+:root {
+  --chart-1: #0172ad;
+  --chart-grid: rgb(127 127 127 / 0.18);
+}
+[data-theme='dark'] {
+  --chart-1: #3a9fd8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --chart-1: #3a9fd8;
+  }
+}
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
+  gap: 1rem;
+}
+.report-grid__wide {
+  grid-column: 1 / -1;
+}
+.chart {
+  margin: 0;
+  padding: 1rem 1.25rem 1.25rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--ws-radius);
+  background: var(--pico-card-background-color);
+  min-width: 0;
+}
+.chart figcaption {
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+.chart details {
+  margin: 1rem 0 0;
+  font-size: 0.85rem;
+}
+.chart details table {
+  margin: 0.5rem 0 0;
+}
+
+/* กราฟแท่งตั้งรายเดือน: เว้นซ้ายไว้ให้ตัวเลขแกน y ล่างไว้ให้ชื่อเดือน */
+.cols {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  align-items: end;
+  height: 12rem;
+  margin: 0.5rem 0 1.75rem 1.75rem;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+.cols__grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--chart-grid);
+  font-size: 0.7rem;
+  line-height: 0;
+  color: var(--pico-muted-color);
+  font-variant-numeric: tabular-nums;
+  text-indent: -1.75rem;
+  pointer-events: none;
+}
+.cols__slot {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  outline: none;
+}
+.cols__bar {
+  position: relative;
+  width: min(24px, 70%);
+  background: var(--chart-1);
+  border-radius: 4px 4px 0 0;
+  min-height: 0;
+}
+.cols__cap {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding-bottom: 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--pico-color);
+}
+.cols__x {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding-top: 0.35rem;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  color: var(--pico-muted-color);
+}
+/* เดือนเยอะ (ทั้งหมด / มือถือ) ชื่อเดือนชนกัน — เหลือทุกเดือนที่ 3 */
+@media (max-width: 600px) {
+  .cols__slot:not(:nth-child(3n + 1)) .cols__x {
+    visibility: hidden;
+  }
+}
+.cols__tip {
+  position: absolute;
+  bottom: calc(100% + 0.25rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.4rem;
+  background: var(--pico-contrast-background);
+  color: var(--pico-contrast-inverse);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.cols__slot:hover .cols__tip,
+.cols__slot:focus-visible .cols__tip {
+  opacity: 1;
+}
+.cols__slot:hover .cols__bar,
+.cols__slot:focus-visible .cols__bar {
+  filter: brightness(1.15);
+}
+.cols__slot:first-of-type .cols__tip {
+  left: 0;
+  transform: none;
+}
+.cols__slot:last-of-type .cols__tip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+/* กราฟแท่งนอน: อุปกรณ์ที่ถูกยืมบ่อย — ค่าอยู่ปลายแท่ง */
+.hbars {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+.hbars li {
+  list-style: none;
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(6rem, 40%) 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+.hbars__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hbars__track {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.hbars__bar {
+  height: 14px;
+  background: var(--chart-1);
+  border-radius: 0 4px 4px 0;
+}
+.hbars__val {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* ตารางในรายงานมีแค่ 3 คอลัมน์ ไม่ต้องกว้างเท่าตารางหน้า staff */
+.chart .table-wrap table {
+  min-width: 0;
+}
+
+/* ---------- แบ่งหน้า (ใต้ตาราง) ---------- */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 1rem 0 0;
+  font-size: 0.9rem;
+}
+.pagination button {
+  width: auto;
+  margin: 0;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+}
+/* select สิทธิ์ในตารางผู้ใช้ — ขนาดเท่าปุ่มในแถว ไม่ต้องสูงเท่าช่องกรอกฟอร์ม */
+.role-select {
+  width: 11rem;
+  margin: 0;
+  padding-block: 0.35rem;
+  font-size: 0.9rem;
 }

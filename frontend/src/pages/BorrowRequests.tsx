@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
+import { Inbox } from 'lucide-react'
 import { api } from '../lib/api'
 import { useFeedback } from '../lib/useFeedback'
 import { formatPeriod, isHolding, isPickedUp, needsPickup } from '../lib/borrow'
+import { usePage } from '../lib/usePage'
 import type { Borrow } from '../types'
 import StatusBadge from '../components/StatusBadge'
+import Pagination from '../components/Pagination'
 
 type Tab = 'pending' | 'waiting' | 'active' | 'done' | 'all'
 
@@ -81,6 +84,7 @@ export default function BorrowRequests() {
       return b.status === 'returned' || b.status === 'rejected' || b.status === 'cancelled'
     return true
   })
+  const pg = usePage(visible, tab)
 
   if (loading) return <p aria-busy="true">กำลังโหลด…</p>
   if (error) return <p className="error">{error}</p>
@@ -114,6 +118,7 @@ export default function BorrowRequests() {
 
       {visible.length === 0 ? (
         <article className="empty">
+          <Inbox aria-hidden="true" />
           <p>ไม่มีรายการในหมวดนี้</p>
         </article>
       ) : (
@@ -130,7 +135,7 @@ export default function BorrowRequests() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((b) => {
+              {pg.rows.map((b) => {
                 const overdue = isOverdue(b)
                 const busy = acting === b.id
                 return (
@@ -149,9 +154,9 @@ export default function BorrowRequests() {
                         <small className="muted-line">สภาพตอนคืน: {b.returnNote}</small>
                       )}
                     </td>
-                    <td className="col-nowrap">{dayjs(b.createdAt).format('D MMM YYYY')}</td>
+                    <td className="col-nowrap">{dayjs(b.createdAt).format('D MMM BBBB')}</td>
                     <td className={`col-grow ${overdue ? 'overdue' : ''}`}>
-                      {formatPeriod(b) ?? dayjs(b.dueDate).format('D MMM YYYY')}
+                      {formatPeriod(b) ?? dayjs(b.dueDate).format('D MMM BBBB')}
                       {overdue && <small className="muted-line">เกินกำหนดแล้ว</small>}
                     </td>
                     <td className="col-nowrap">
@@ -254,6 +259,7 @@ export default function BorrowRequests() {
           </table>
         </div>
       )}
+      <Pagination {...pg} />
     </>
   )
 }

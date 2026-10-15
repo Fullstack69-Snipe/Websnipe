@@ -1,25 +1,9 @@
 import { useEffect, useState } from 'react'
-import dayjs, { type Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
 import { api } from '../lib/api'
+import { bookedIn, formatBooking } from '../lib/booking'
 import { useFeedback } from '../lib/useFeedback'
 import type { Booking, Equipment } from '../types'
-
-// ต้องคิดเหมือน overlapsSql ฝั่ง backend: รายการเก่าไม่มีช่วงเวลา และของที่เลยกำหนดแล้วยังไม่คืน
-// ถือว่าจองไว้เรื่อย ๆ จนกว่าจะคืน (ไม่รู้ว่าจะได้ของคืนเมื่อไหร่)
-const FOREVER = dayjs('9999-12-31')
-const bookingEnd = (b: Booking) =>
-  b.endAt && dayjs(b.endAt).isAfter(dayjs()) ? dayjs(b.endAt) : FOREVER
-const overlaps = (b: Booking, start: Dayjs, end: Dayjs) =>
-  b.startAt === null || (dayjs(b.startAt).isBefore(end) && bookingEnd(b).isAfter(start))
-
-function formatBooking(b: Booking) {
-  if (b.startAt === null || bookingEnd(b) === FOREVER) return 'ยืมอยู่ ยังไม่ได้คืน'
-  const start = dayjs(b.startAt)
-  const end = dayjs(b.endAt)
-  return start.isSame(end, 'month')
-    ? `${start.format('D')}–${end.format('D MMM')}`
-    : `${start.format('D MMM')} – ${end.format('D MMM')}`
-}
 
 type Props = {
   items: Equipment[]
@@ -28,14 +12,16 @@ type Props = {
   onDone: (failed: Equipment[]) => void
   // ไม่ส่งมา = เอาชิ้นออกจากรายการไม่ได้ (เช่น ยืมจากหน้าอุปกรณ์ชิ้นเดียว)
   onRemove?: (item: Equipment) => void
+  // วันเริ่มที่เลือกมาจากปฏิทินหน้าอุปกรณ์ ('YYYY-MM-DD') — ไม่ส่ง = วันนี้
+  initialStart?: string
 }
 
 // dialog ขอยืม ใช้ร่วมกันระหว่างหน้ารายการ (เลือกหลายชิ้น) กับหน้าอุปกรณ์ชิ้นเดียว
-export default function BorrowDialog({ items, onClose, onDone, onRemove }: Props) {
+export default function BorrowDialog({ items, onClose, onDone, onRemove, initialStart }: Props) {
   const { toast } = useFeedback()
   // ช่วงเวลายืม — เก็บเป็น 'YYYY-MM-DD' ให้ <input type="date"> ใช้ได้ตรง ๆ
-  const [startDate, setStartDate] = useState(dayjs().format('YYYY-MM-DD'))
-  const [dueDate, setDueDate] = useState(dayjs().add(7, 'day').format('YYYY-MM-DD'))
+  const [startDate, setStartDate] = useState(initialStart ?? dayjs().format('YYYY-MM-DD'))
+  const [dueDate, setDueDate] = useState(dayjs(initialStart).add(7, 'day').format('YYYY-MM-DD'))
   const [submitting, setSubmitting] = useState(false)
   // เหตุผลที่ขอยืม — ไม่บังคับ แต่ช่วยให้เจ้าหน้าที่ตัดสินใจง่ายขึ้น
   const [purpose, setPurpose] = useState('')
@@ -59,7 +45,7 @@ export default function BorrowDialog({ items, onClose, onDone, onRemove }: Props
   const freeIn = (item: Equipment) => {
     const list = bookings[item.id]
     if (!list) return undefined
-    return item.quantity - list.filter((b) => overlaps(b, rangeStart, rangeEnd)).length
+    return item.quantity - bookedIn(list, rangeStart, rangeEnd)
   }
   const fullItems = items.filter((i) => (freeIn(i) ?? 1) <= 0)
 

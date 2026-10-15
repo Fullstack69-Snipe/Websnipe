@@ -114,6 +114,18 @@ export type BorrowDetails = {
   pickedUpBy: string | null
 }
 
+// แจ้งเตือนในเว็บ (ตั้งชื่อ AppNotification เพราะ Notification ชนกับ type ของเบราว์เซอร์)
+export type AppNotification = {
+  id: number
+  borrowId: string | null
+  type: string
+  title: string
+  body: string | null
+  link: string | null
+  readAt: string | null
+  createdAt: string
+}
+
 export type Department = {
   id: number
   name: string

@@ -1,4 +1,6 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { api } from '../lib/api'
+import { shrinkImage } from '../lib/image'
 import { useFeedback } from '../lib/useFeedback'
 import type { Category, Department, Equipment, EquipmentInput } from '../types'
 
@@ -20,14 +22,22 @@ export default function EquipmentForm({ initial, categories, departments, onSubm
   const [categoryId, setCategoryId] = useState<number | null>(initial?.categoryId ?? null)
   const [departmentId, setDepartmentId] = useState<number | null>(initial?.departmentId ?? null)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
-  // อ่านไฟล์รูปเป็น data URL — ตอนต่อ backend จริงค่อยเปลี่ยนเป็นอัปโหลดขึ้น Storage
-  function handleFile(e: ChangeEvent<HTMLInputElement>) {
+  // ย่อรูปแล้วอัปโหลดขึ้น backend ได้ url กลับมาใส่ imageUrl
+  // (เดิมเก็บเป็น data URL ในฐานข้อมูลตรง ๆ — รูปจากมือถือเกินลิมิต 2MB ของ JSON จนบันทึกไม่ได้)
+  async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
+    e.target.value = '' // เลือกไฟล์เดิมซ้ำได้ (เช่น หลังลบรูป)
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => setImageUrl(reader.result as string)
-    reader.readAsDataURL(file)
+    setUploading(true)
+    try {
+      setImageUrl(await api.uploadImage(await shrinkImage(file)))
+    } catch (err) {
+      toast(err instanceof Error && err.message ? `อัปโหลดรูปไม่สำเร็จ: ${err.message}` : 'อัปโหลดรูปไม่สำเร็จ', 'error')
+    } finally {
+      setUploading(false)
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -127,7 +137,8 @@ export default function EquipmentForm({ initial, categories, departments, onSubm
 
           <label>
             รูปภาพ
-            <input type="file" accept="image/*" onChange={handleFile} />
+            <input type="file" accept="image/*" onChange={(e) => void handleFile(e)} disabled={uploading} />
+            {uploading && <small aria-busy="true">กำลังย่อและอัปโหลดรูป…</small>}
           </label>
 
           {imageUrl && (
@@ -144,7 +155,7 @@ export default function EquipmentForm({ initial, categories, departments, onSubm
           <button type="button" className="secondary" onClick={onClose} disabled={saving}>
             ยกเลิก
           </button>
-          <button type="submit" form="equipment-form" aria-busy={saving}>
+          <button type="submit" form="equipment-form" aria-busy={saving} disabled={uploading}>
             บันทึก
           </button>
         </footer>

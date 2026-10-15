@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Building2, Package, Tag } from 'lucide-react'
 import type { Equipment } from '../types'
 import StatusBadge from './StatusBadge'
 
@@ -30,12 +31,29 @@ export default function EquipmentCard({ item, onBorrow, selected, onToggleSelect
         <StatusBadge status={isAvailable ? 'available' : 'borrowed'} />
       </header>
 
-      {item.categoryName && <p className="chip">{item.categoryName}</p>}
+      {(item.categoryName || item.departmentName) && (
+        <div className="equipment-card__tags">
+          {item.categoryName && (
+            <span className="chip">
+              <Tag aria-hidden="true" />
+              {item.categoryName}
+            </span>
+          )}
+          {/* แผนก = ไปรับของที่ไหน */}
+          {item.departmentName && (
+            <span className="chip">
+              <Building2 aria-hidden="true" />
+              {item.departmentName}
+            </span>
+          )}
+        </div>
+      )}
 
-      <p>{item.description}</p>
+      <p className="equipment-card__desc">{item.description}</p>
 
       <footer>
         <span className={`stock ${isAvailable ? '' : 'stock--empty'}`}>
+          <Package aria-hidden="true" />
           เหลือ <strong>{item.available}</strong> / {item.quantity} ชิ้น
         </span>
 

@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import dayjs from 'dayjs'
+import { ClipboardList, History } from 'lucide-react'
 import { api } from '../lib/api'
 import { useFeedback } from '../lib/useFeedback'
 import { ACTIVE, formatPeriod, isPickedUp, needsPickup } from '../lib/borrow'
+import { usePage } from '../lib/usePage'
 import type { Borrow } from '../types'
 import StatusBadge from '../components/StatusBadge'
 import BorrowSteps from '../components/BorrowSteps'
+import Pagination from '../components/Pagination'
 
 export default function MyBorrows() {
   const { toast, confirm } = useFeedback()
@@ -79,6 +83,7 @@ export default function MyBorrows() {
 
   const active = borrows.filter((b) => ACTIVE.includes(b.status))
   const history = borrows.filter((b) => !ACTIVE.includes(b.status))
+  const historyPage = usePage(history, '', 10)
 
   if (loading) return <p aria-busy="true">กำลังโหลด…</p>
   if (error) return <p className="error">{error}</p>
@@ -92,7 +97,12 @@ export default function MyBorrows() {
 
       <h2>กำลังดำเนินการ ({active.length})</h2>
       {active.length === 0 ? (
-        <article className="empty"><p>ยังไม่มีรายการยืม</p></article>
+        <article className="empty">
+          <ClipboardList aria-hidden="true" />
+          <p>
+            ยังไม่มีรายการยืม — <Link to="/equipment">ไปเลือกอุปกรณ์</Link>
+          </p>
+        </article>
       ) : (
         <BorrowTable
           rows={active}
@@ -104,9 +114,15 @@ export default function MyBorrows() {
 
       <h2>ประวัติ ({history.length})</h2>
       {history.length === 0 ? (
-        <article className="empty"><p>ยังไม่มีประวัติ</p></article>
+        <article className="empty">
+          <History aria-hidden="true" />
+          <p>ยังไม่มีประวัติ</p>
+        </article>
       ) : (
-        <BorrowTable rows={history} />
+        <>
+          <BorrowTable rows={historyPage.rows} />
+          <Pagination {...historyPage} />
+        </>
       )}
     </>
   )
@@ -150,9 +166,9 @@ function BorrowTable({ rows, onReturn, onCancel, onPickup }: TableProps) {
                     <small className="muted-line">สภาพตอนคืน: {b.returnNote}</small>
                   )}
                 </td>
-                <td>{dayjs(b.createdAt).format('D MMM YYYY')}</td>
+                <td>{dayjs(b.createdAt).format('D MMM BBBB')}</td>
                 <td className={overdue ? 'overdue' : undefined}>
-                  {formatPeriod(b) ?? dayjs(b.dueDate).format('D MMM YYYY')}
+                  {formatPeriod(b) ?? dayjs(b.dueDate).format('D MMM BBBB')}
                   {overdue && <small className="muted-line">เกินกำหนดแล้ว</small>}
                 </td>
                 <td>

@@ -1,14 +1,25 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import dayjs from 'dayjs'
+import {
+  Building2,
+  CalendarPlus,
+  ClipboardList,
+  Inbox,
+  Package,
+  Printer,
+  QrCode,
+  Tag,
+} from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/useAuth'
 import { useFeedback } from '../lib/useFeedback'
 import { ACTIVE, formatPeriod, isHolding, isPickedUp, needsPickup } from '../lib/borrow'
-import type { Borrow, Equipment } from '../types'
+import type { Booking, Borrow, Equipment } from '../types'
 import StatusBadge from '../components/StatusBadge'
 import BorrowDialog from '../components/BorrowDialog'
 import BorrowSteps from '../components/BorrowSteps'
+import BookingCalendar from '../components/BookingCalendar'
 
 // หน้าของอุปกรณ์ชิ้นเดียว — ปลายทางของ QR ที่ติดบนตัวของ
 // สแกนแล้วทำต่อได้จากหน้านี้เลย ตามว่าใครสแกน:
@@ -21,22 +32,26 @@ export default function EquipmentDetail() {
   const [item, setItem] = useState<Equipment | null>(null)
   const [mine, setMine] = useState<Borrow[]>([])
   const [requests, setRequests] = useState<Borrow[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [borrowing, setBorrowing] = useState(false)
+  // false = ปิดหน้าต่างขอยืม, string = เปิดโดยเริ่มวันนั้น ('' = วันนี้)
+  const [borrowing, setBorrowing] = useState<string | false>(false)
   const [acting, setActing] = useState<string | null>(null) // id ของรายการที่กำลังทำงานอยู่
 
   const isStaff = role === 'staff' || role === 'admin'
 
   const load = useCallback(async () => {
     try {
-      const [eq, my, all] = await Promise.all([
+      const [eq, booked, my, all] = await Promise.all([
         api.getEquipment(id),
+        api.equipmentBookings(id),
         api.listMyBorrows(),
         // staff เห็นเฉพาะคำขอของแผนกที่ดูแลอยู่แล้ว (backend กรองให้)
         isStaff ? api.listBorrows() : Promise.resolve([]),
       ])
       const open = (b: Borrow) => b.equipmentId === id && ACTIVE.includes(b.status)
       setItem(eq)
+      setBookings(booked)
       setMine(my.filter(open))
       setRequests(all.filter(open))
     } catch (err) {
@@ -81,15 +96,23 @@ export default function EquipmentDetail() {
     (role === 'staff' &&
       (item.departmentId === null || (user?.departmentIds ?? []).includes(item.departmentId)))
 
-  const period = (b: Borrow) => formatPeriod(b) ?? `ถึง ${dayjs(b.dueDate).format('D MMM YYYY')}`
+  const period = (b: Borrow) => formatPeriod(b) ?? `ถึง ${dayjs(b.dueDate).format('D MMM BBBB')}`
 
   return (
     <>
-      <p>
-        <Link to={item.departmentId ? `/equipment?department=${item.departmentId}` : '/equipment'}>
-          ← {item.departmentName ?? 'รายการอุปกรณ์'}
-        </Link>
-      </p>
+      <nav aria-label="breadcrumb" className="breadcrumb">
+        <ul>
+          <li>
+            <Link to="/">หน้าแรก</Link>
+          </li>
+          <li>
+            <Link to={item.departmentId ? `/equipment?department=${item.departmentId}` : '/equipment'}>
+              {item.departmentName ?? 'รายการอุปกรณ์'}
+            </Link>
+          </li>
+          <li>{item.name}</li>
+        </ul>
+      </nav>
 
       <article className="equipment-detail">
         {item.imageUrl ? (
@@ -104,20 +127,38 @@ export default function EquipmentDetail() {
             <StatusBadge status={isAvailable ? 'available' : 'borrowed'} />
           </header>
 
-          <p>
-            {item.categoryName && <span className="chip">{item.categoryName}</span>}{' '}
-            {item.departmentName && <span className="chip">แผนก {item.departmentName}</span>}
-          </p>
+          {item.description && <p className="equipment-detail__desc">{item.description}</p>}
 
-          {item.description && <p>{item.description}</p>}
-
-          <p className={`stock ${isAvailable ? '' : 'stock--empty'}`}>
-            เหลือตอนนี้ <strong>{item.available}</strong> / {item.quantity} ชิ้น
-          </p>
+          <dl className="detail-facts">
+            <div>
+              <dt>
+                <Tag aria-hidden="true" />
+                หมวดหมู่
+              </dt>
+              <dd>{item.categoryName ?? 'ไม่ระบุ'}</dd>
+            </div>
+            <div>
+              <dt>
+                <Building2 aria-hidden="true" />
+                แผนกที่ดูแล (รับ-คืนของ)
+              </dt>
+              <dd>{item.departmentName ?? 'ไม่สังกัดแผนก'}</dd>
+            </div>
+            <div>
+              <dt>
+                <Package aria-hidden="true" />
+                คงเหลือตอนนี้
+              </dt>
+              <dd className={`stock ${isAvailable ? '' : 'stock--empty'}`}>
+                <strong>{item.available}</strong> / {item.quantity} ชิ้น
+              </dd>
+            </div>
+          </dl>
 
           {/* ของหมดตอนนี้ก็ยังจองช่วงอื่นได้ ระบบตรวจตามช่วงเวลาให้ */}
           {item.quantity > 0 && (
-            <button type="button" className="detail-borrow" onClick={() => setBorrowing(true)}>
+            <button type="button" className="detail-borrow" onClick={() => setBorrowing('')}>
+              <CalendarPlus aria-hidden="true" />
               ขอยืม
             </button>
           )}
@@ -127,7 +168,10 @@ export default function EquipmentDetail() {
       {mine.length > 0 && (
         <article className="detail-panel">
           <header>
-            <strong>การยืมของคุณ</strong>
+            <strong>
+              <ClipboardList aria-hidden="true" />
+              การยืมของคุณ
+            </strong>
           </header>
           <div className="table-wrap">
             <table>
@@ -223,7 +267,10 @@ export default function EquipmentDetail() {
       {canManage && (
         <article className="detail-panel">
           <header>
-            <strong>รายการที่ต้องจัดการ ({requests.length})</strong>
+            <strong>
+              <Inbox aria-hidden="true" />
+              รายการที่ต้องจัดการ ({requests.length})
+            </strong>
           </header>
           {requests.length === 0 ? (
             <p className="muted">ไม่มีคำขอค้างอยู่กับอุปกรณ์ชิ้นนี้</p>
@@ -345,22 +392,32 @@ export default function EquipmentDetail() {
         </article>
       )}
 
+      {/* อยู่ใต้กล่องรายการ — คนสแกน QR มาเพื่อกดรับ/คืนของเป็นหลัก */}
+      {item.quantity > 0 && (
+        <BookingCalendar bookings={bookings} quantity={item.quantity} onPickDay={setBorrowing} />
+      )}
+
       {isStaff && (
         <article className="qr-card">
           <img src={api.qrImageUrl(item.id)} alt={`QR ของ ${item.name}`} width={160} height={160} />
           <div>
-            <strong>{item.name}</strong>
+            <strong>
+              <QrCode aria-hidden="true" />
+              {item.name}
+            </strong>
             <p className="muted">พิมพ์ติดตัวอุปกรณ์ — สแกนด้วยกล้องมือถือแล้วเปิดหน้านี้ได้ทันที</p>
             <button type="button" className="outline" onClick={() => window.print()}>
+              <Printer aria-hidden="true" />
               พิมพ์ QR
             </button>
           </div>
         </article>
       )}
 
-      {borrowing && (
+      {borrowing !== false && (
         <BorrowDialog
           items={[item]}
+          initialStart={borrowing || undefined}
           onClose={() => setBorrowing(false)}
           onDone={(failed) => {
             if (failed.length === 0) setBorrowing(false)

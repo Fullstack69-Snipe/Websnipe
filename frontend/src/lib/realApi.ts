@@ -1,6 +1,6 @@
 import type {
   Equipment, EquipmentInput, Borrow, EquipmentLog,
-  Category, CategoryInput, User, Role, Department, Booking,
+  Category, CategoryInput, User, Role, Department, Booking, AppNotification,
 } from '../types'
 
 // ===================================================================
@@ -145,6 +145,13 @@ export const realApi = {
   unassignEquipmentFromDepartment: (departmentId: number, equipmentId: string) =>
     send<void>('DELETE', `/departments/${departmentId}/equipment/${equipmentId}`),
 
+  // ===== แจ้งเตือน =====
+  listNotifications: () => get<{ items: AppNotification[]; unread: number }>('/notifications'),
+
+  markNotificationRead: (id: number) => send<void>('PUT', `/notifications/${id}/read`),
+
+  markAllNotificationsRead: () => send<void>('PUT', '/notifications/read-all'),
+
   // ===== ผู้ใช้ — ฝั่ง admin =====
   listUsers: () => get<User[]>('/users'),
 
@@ -156,6 +163,9 @@ export const realApi = {
   // ผู้ใช้ปัจจุบันจาก session — 401 ถ้ายังไม่ได้เข้าสู่ระบบ
   // departmentIds = แผนกที่ staff คนนี้ดูแล (ใช้ซ่อนปุ่มจัดการอุปกรณ์นอกแผนก)
   me: () => get<User & { activeRole: Role; departmentIds: number[] }>('/me'),
+
+  // รูปอุปกรณ์ให้หน้าเข้าสู่ระบบวนโชว์ — เรียกได้ตอนยังไม่ login
+  showcasePhotos: () => get<{ photos: string[] }>('/showcase'),
 
   // ช่องทาง login ที่เปิดใช้อยู่ (ตามที่ตั้ง env ไว้ฝั่ง backend)
   authProviders: () => get<{ providers: { name: string; label: string }[] }>('/auth/providers'),

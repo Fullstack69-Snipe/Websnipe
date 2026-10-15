@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Plus } from 'lucide-react'
 import { api } from '../lib/api'
 import { useFeedback } from '../lib/useFeedback'
 import type { Category } from '../types'
@@ -111,6 +112,7 @@ export default function ManageCategories() {
         </label>
         <div className="actions">
           <button type="submit" aria-busy={saving}>
+            {!editing && <Plus aria-hidden="true" />}
             {editing ? 'บันทึกการแก้ไข' : 'เพิ่มหมวดหมู่'}
           </button>
           {editing && (

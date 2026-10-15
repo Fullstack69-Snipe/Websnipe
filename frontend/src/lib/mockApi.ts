@@ -159,6 +159,24 @@ export const mockApi = {
 
   qrImageUrl: () => '',
 
+  // โหมด mock ไม่มีแจ้งเตือน
+  async listNotifications() {
+    return { items: [], unread: 0 }
+  },
+  async markNotificationRead() {},
+  async markAllNotificationsRead() {},
+
+  // โหมด mock ไม่มี backend ให้อัปโหลด — ใช้ URL ชั่วคราวของไฟล์ในเบราว์เซอร์แทน
+  async uploadImage(file: File): Promise<string> {
+    await delay()
+    return URL.createObjectURL(file)
+  },
+
+  // โหมด mock ไม่มีรูปจาก backend — หน้า login ใช้รูปตั้งต้นของตัวเองแทน
+  async showcasePhotos() {
+    return { photos: [] as string[] }
+  },
+
   async equipmentBookings() {
     await delay(0)
     return []

@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Plus, QrCode, SearchX } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/useAuth'
 import { useFeedback } from '../lib/useFeedback'
+import { usePage } from '../lib/usePage'
 import type { Category, Department, Equipment, EquipmentInput } from '../types'
 import EquipmentForm from '../components/EquipmentForm'
 import EquipmentHistory from '../components/EquipmentHistory'
+import Pagination from '../components/Pagination'
 
 // null = ปิดฟอร์ม / 'new' = เพิ่มใหม่ / Equipment = แก้ไขชิ้นนั้น
 type Editing = null | 'new' | Equipment
@@ -21,6 +24,7 @@ export default function ManageEquipment() {
   const [historyOf, setHistoryOf] = useState<Equipment | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
+  const [q, setQ] = useState('')
 
   async function load() {
     try {
@@ -80,6 +84,12 @@ export default function ManageEquipment() {
     item.departmentId === null ||
     (user?.departmentIds ?? []).includes(item.departmentId)
 
+  const needle = q.trim().toLowerCase()
+  const filtered = items.filter((e) =>
+    [e.name, e.categoryName, e.departmentName].some((v) => v?.toLowerCase().includes(needle)),
+  )
+  const pg = usePage(filtered, needle)
+
   if (loading) return <p aria-busy="true">กำลังโหลด…</p>
   if (error) return <p className="error">{error}</p>
 
@@ -91,15 +101,32 @@ export default function ManageEquipment() {
       </hgroup>
 
       <div className="toolbar">
-        <p className="muted">ทั้งหมด {items.length} รายการ</p>
+        <input
+          type="search"
+          placeholder="ค้นหาชื่อ หมวดหมู่ หรือแผนก"
+          aria-label="ค้นหาอุปกรณ์"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <p className="muted">{needle ? `พบ ${filtered.length} จาก ${items.length}` : `ทั้งหมด ${items.length}`} รายการ</p>
+        <Link to="/manage/qr" role="button" className="outline">
+          <QrCode aria-hidden="true" />
+          พิมพ์ QR
+        </Link>
         <button type="button" onClick={() => setEditing('new')}>
-          + เพิ่มอุปกรณ์
+          <Plus aria-hidden="true" />
+          เพิ่มอุปกรณ์
         </button>
       </div>
 
       {items.length === 0 ? (
         <article className="empty">
           <p>ยังไม่มีอุปกรณ์ในระบบ กดปุ่ม "เพิ่มอุปกรณ์" เพื่อเริ่ม</p>
+        </article>
+      ) : filtered.length === 0 ? (
+        <article className="empty">
+          <SearchX aria-hidden="true" />
+          <p>ไม่พบอุปกรณ์ที่ตรงกับ "{q}"</p>
         </article>
       ) : (
         <div className="table-wrap">
@@ -116,7 +143,7 @@ export default function ManageEquipment() {
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => {
+              {pg.rows.map((item) => {
                 const borrowed = item.quantity - item.available
                 return (
                   <tr key={item.id}>
@@ -182,6 +209,7 @@ export default function ManageEquipment() {
           </table>
         </div>
       )}
+      <Pagination {...pg} />
 
       {historyOf && (
         <EquipmentHistory item={historyOf} onClose={() => setHistoryOf(null)} />

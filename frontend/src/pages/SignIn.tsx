@@ -1,13 +1,36 @@
 import { useEffect, useState } from 'react'
+import { CalendarRange, History, QrCode } from 'lucide-react'
 import { api } from '../lib/api'
 import ProviderIcon from '../components/ProviderIcon'
+import BrandMark from '../components/BrandMark'
 
 // ปุ่มเข้าสู่ระบบจะขึ้นเฉพาะช่องทางที่ backend ตั้ง client id/secret ไว้แล้ว
 // (ดู backend/src/config/oauth.js) ถ้ายังไม่ได้ตั้งจะเห็นข้อความบอกวิธี
 
+const FEATURES = [
+  { icon: CalendarRange, text: 'จองอุปกรณ์ล่วงหน้าตามช่วงวันที่ต้องใช้ เห็นทันทีว่าว่างหรือไม่' },
+  { icon: QrCode, text: 'สแกน QR บนตัวอุปกรณ์ เพื่อดูรายละเอียด ขอยืม และยืนยันรับของ' },
+  { icon: History, text: 'ติดตามสถานะได้ทุกขั้นตอน ตั้งแต่ขอยืมจนถึงคืนของ' },
+]
+
+// รูปสำรองจากข้อมูลตั้งต้น (frontend/public/seed) — ใช้ตอนดึงรูปจาก backend ไม่ได้
+const FALLBACK_PHOTOS = [
+  '/seed/canon-eos-r50.jpg',
+  '/seed/dell-latitude-7490.jpg',
+  '/seed/epson-eb-u04.jpg',
+  '/seed/rode-wireless-go-ii.jpg',
+  '/seed/manfrotto-190xb.jpg',
+  '/seed/godox-tt685ii.jpg',
+]
+const SLOTS = 3
+const ROTATE_MS = 3000
+
 export default function SignIn() {
   const [providers, setProviders] = useState<{ name: string; label: string }[]>([])
   const [loading, setLoading] = useState(true)
+  const [photos, setPhotos] = useState(FALLBACK_PHOTOS)
+  // index ของรูปที่แสดงอยู่ในแต่ละช่อง
+  const [frames, setFrames] = useState([0, 1, 2])
 
   // ?error=... มาจาก callback ตอนผู้ใช้กดยกเลิกหรือ state ไม่ตรง
   // ?next=... หน้าที่จะกลับไปหลัง login (backend ตรวจอีกรอบว่าเป็น path ในแอปนี้)
@@ -21,21 +44,66 @@ export default function SignIn() {
       .then((r) => setProviders(r.providers))
       .catch(() => setProviders([]))
       .finally(() => setLoading(false))
+
+    // รูปอุปกรณ์จริงในระบบ — น้อยกว่าจำนวนช่องก็ใช้รูปสำรองต่อไป
+    api
+      .showcasePhotos()
+      .then((r) => {
+        if (r.photos.length >= SLOTS) setPhotos(r.photos)
+      })
+      .catch(() => {})
   }, [])
+
+  // เปลี่ยนรูปทีละช่องวนไปเรื่อย ๆ — มีรูปไม่เกินจำนวนช่อง หรือผู้ใช้ตั้งลดการเคลื่อนไหวไว้ ก็ไม่วน
+  useEffect(() => {
+    setFrames([0, 1, 2])
+    if (photos.length <= SLOTS || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    let cursor = SLOTS
+    let slot = 0
+    const timer = setInterval(() => {
+      const next = cursor % photos.length
+      const target = slot
+      setFrames((f) => f.map((v, i) => (i === target ? next : v)))
+      cursor += 1
+      slot = (slot + 1) % SLOTS
+    }, ROTATE_MS)
+    return () => clearInterval(timer)
+  }, [photos])
 
   return (
     <main className="signin">
+      {/* แผงซ้าย: บอกว่าระบบนี้คืออะไร — จอแคบซ่อนไว้ เหลือแต่การ์ดเข้าสู่ระบบ */}
+      <section className="signin__brand" aria-hidden="true">
+        <span className="signin__brand-mark">
+          <BrandMark size="lg" />
+        </span>
+        <h2>ยืม-คืนอุปกรณ์ได้ในที่เดียว</h2>
+        <p>ค้นหา จอง และติดตามการยืมอุปกรณ์ของคณะได้จากทุกที่</p>
+        <ul className="signin__features">
+          {FEATURES.map(({ icon: Icon, text }) => (
+            <li key={text}>
+              <span>
+                <Icon />
+              </span>
+              {text}
+            </li>
+          ))}
+        </ul>
+        <div className="signin__photos">
+          {/* key เปลี่ยนเมื่อรูปในช่องเปลี่ยน -> img ถูกสร้างใหม่ แอนิเมชันจางเข้าจึงเล่นทุกครั้ง */}
+          {frames.map((index, slot) => (
+            <img key={`${slot}-${index}`} src={photos[index]} alt="" />
+          ))}
+        </div>
+      </section>
+
       <article className="signin__card">
         <header className="signin__head">
-          <span className="signin__logo" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 8 12 3 3 8l9 5 9-5Z" />
-              <path d="M3 8v8l9 5 9-5V8" />
-              <path d="M12 13v8" />
-            </svg>
+          <span className="signin__logo-mobile">
+            <BrandMark />
           </span>
-          <h1>ระบบยืม-คืนอุปกรณ์</h1>
-          <p>จัดการการยืม-คืนอุปกรณ์ภายในองค์กร</p>
+          <h1>เข้าสู่ระบบ</h1>
+          <p>ใช้บัญชีของคุณเพื่อเข้าใช้งาน BORROW APP</p>
         </header>
 
         {error && (

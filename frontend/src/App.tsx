@@ -14,6 +14,8 @@ import BorrowRequests from './pages/BorrowRequests'
 import ManageCategories from './pages/ManageCategories'
 import ManageUsers from './pages/ManageUsers'
 import ManageDepartments from './pages/ManageDepartments'
+import QrLabels from './pages/QrLabels'
+import Reports from './pages/Reports'
 import type { Role } from './types'
 
 // ยังไม่ได้ login -> ไปหน้า sign-in
@@ -76,6 +78,22 @@ export default function App() {
               element={
                 <Guard allow={STAFF}>
                   <BorrowRequests />
+                </Guard>
+              }
+            />
+            <Route
+              path="/manage/reports"
+              element={
+                <Guard allow={STAFF}>
+                  <Reports />
+                </Guard>
+              }
+            />
+            <Route
+              path="/manage/qr"
+              element={
+                <Guard allow={STAFF}>
+                  <QrLabels />
                 </Guard>
               }
             />
