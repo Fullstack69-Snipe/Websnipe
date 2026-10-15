@@ -1,0 +1,26 @@
+# บังคับ line ending ให้เหมือนกันทุกเครื่อง ไม่ว่าใครใช้ Windows หรือ macOS/Linux
+#
+# ถ้าไม่มีไฟล์นี้ git บน Windows (core.autocrlf=true) จะแปลงไฟล์เป็น CRLF ตอน clone
+# ทำให้ shell script ที่ต้องรันใน container Linux พังด้วย error:
+#   /bin/bash^M: bad interpreter: No such file or directory
+
+* text=auto eol=lf
+
+# สคริปต์ที่รันบน Linux — ต้องเป็น LF เสมอ
+*.sh text eol=lf
+
+# ไฟล์ของ Windows — ต้องเป็น CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# ไฟล์ไบนารี — ห้าม git แตะ line ending
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.svg text
+*.pdf binary
+*.woff binary
+*.woff2 binary

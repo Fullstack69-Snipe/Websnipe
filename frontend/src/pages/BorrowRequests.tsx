@@ -5,10 +5,11 @@ import { useFeedback } from '../lib/useFeedback'
 import type { Borrow } from '../types'
 import StatusBadge from '../components/StatusBadge'
 
-type Tab = 'pending' | 'active' | 'done' | 'all'
+type Tab = 'pending' | 'waiting' | 'active' | 'done' | 'all'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'pending', label: 'รออนุมัติ' },
+  { key: 'waiting', label: 'รอมารับของ' },
   { key: 'active', label: 'กำลังยืม' },
   { key: 'done', label: 'จบแล้ว' },
   { key: 'all', label: 'ทั้งหมด' },
@@ -16,6 +17,22 @@ const TABS: { key: Tab; label: string }[] = [
 
 const isHolding = (b: Borrow) => b.status === 'approved' || b.status === 'returning'
 const isOverdue = (b: Borrow) => isHolding(b) && dayjs().isAfter(dayjs(b.dueDate), 'day')
+
+// อนุมัติแล้วแต่ผู้ยืมยังไม่มารับของ
+// รายการเก่าที่ไม่มี details ถือว่ารับไปแล้ว เพราะย้อนไปเช็คไม่ได้
+const needsPickup = (b: Borrow) =>
+  b.status === 'approved' && b.details !== null && b.details.pickedUpAt === null
+
+const isPickedUp = (b: Borrow) => b.details === null || b.details.pickedUpAt !== null
+
+// แสดงช่วงเวลายืมแบบสั้น — ถ้าปีเดียวกันไม่ต้องซ้ำปี
+function formatPeriod(b: Borrow) {
+  if (!b.details) return null
+  const start = dayjs(b.details.startAt)
+  const end = dayjs(b.details.endAt)
+  const sameYear = start.year() === end.year()
+  return `${start.format(sameYear ? 'D MMM' : 'D MMM YYYY')} – ${end.format('D MMM YYYY')}`
+}
 
 export default function BorrowRequests() {
   const { toast, confirm, prompt } = useFeedback()
@@ -67,14 +84,15 @@ export default function BorrowRequests() {
   // ---------- สรุปตัวเลข (ภาพรวมสำหรับ admin) ----------
   const stats = {
     pending: borrows.filter((b) => b.status === 'pending').length,
-    active: borrows.filter(isHolding).length,
-    returning: borrows.filter((b) => b.status === 'returning').length,
+    waiting: borrows.filter(needsPickup).length,
+    active: borrows.filter((b) => isHolding(b) && isPickedUp(b)).length,
     overdue: borrows.filter(isOverdue).length,
   }
 
   const visible = borrows.filter((b) => {
     if (tab === 'pending') return b.status === 'pending'
-    if (tab === 'active') return isHolding(b)
+    if (tab === 'waiting') return needsPickup(b)
+    if (tab === 'active') return isHolding(b) && isPickedUp(b)
     if (tab === 'done')
       return b.status === 'returned' || b.status === 'rejected' || b.status === 'cancelled'
     return true
@@ -92,8 +110,8 @@ export default function BorrowRequests() {
 
       <div className="stats">
         <Stat label="รออนุมัติ" value={stats.pending} tone="pending" />
+        <Stat label="รอมารับของ" value={stats.waiting} tone="warn" />
         <Stat label="กำลังยืม" value={stats.active} />
-        <Stat label="แจ้งคืนแล้ว" value={stats.returning} tone="warn" />
         <Stat label="เกินกำหนด" value={stats.overdue} tone="danger" />
       </div>
 
@@ -119,12 +137,12 @@ export default function BorrowRequests() {
           <table>
             <thead>
               <tr>
-                <th>ผู้ยืม</th>
-                <th>อุปกรณ์</th>
-                <th>วันที่ขอ</th>
-                <th>กำหนดคืน</th>
-                <th>สถานะ</th>
-                <th></th>
+                <th className="col-borrower">ผู้ยืม</th>
+                <th className="col-name">อุปกรณ์</th>
+                <th className="col-nowrap">วันที่ขอ</th>
+                <th className="col-grow">ช่วงเวลายืม</th>
+                <th className="col-nowrap">สถานะ</th>
+                <th className="col-actions"></th>
               </tr>
             </thead>
             <tbody>
@@ -133,8 +151,8 @@ export default function BorrowRequests() {
                 const busy = acting === b.id
                 return (
                   <tr key={b.id}>
-                    <td>{b.borrowerName}</td>
-                    <td>
+                    <td className="col-borrower">{b.borrowerName}</td>
+                    <td className="col-name">
                       {b.equipmentName}
                       {b.purpose && <small className="muted-line">เพื่อ: {b.purpose}</small>}
                       {b.approverName && b.status !== 'rejected' && (
@@ -147,13 +165,21 @@ export default function BorrowRequests() {
                         <small className="muted-line">สภาพตอนคืน: {b.returnNote}</small>
                       )}
                     </td>
-                    <td>{dayjs(b.createdAt).format('D MMM YYYY')}</td>
-                    <td className={overdue ? 'overdue' : undefined}>
-                      {dayjs(b.dueDate).format('D MMM YYYY')}
-                      {overdue && ' — เกินกำหนด'}
+                    <td className="col-nowrap">{dayjs(b.createdAt).format('D MMM YYYY')}</td>
+                    <td className={`col-grow ${overdue ? 'overdue' : ''}`}>
+                      {formatPeriod(b) ?? dayjs(b.dueDate).format('D MMM YYYY')}
+                      {overdue && <small className="muted-line">เกินกำหนดแล้ว</small>}
                     </td>
-                    <td><StatusBadge status={b.status} /></td>
-                    <td>
+                    <td className="col-nowrap">
+                      <StatusBadge status={b.status} />
+                      {needsPickup(b) && <small className="muted-line">ยังไม่มารับของ</small>}
+                      {b.status === 'approved' && isPickedUp(b) && b.details && (
+                        <small className="muted-line">
+                          รับของ {dayjs(b.details.pickedUpAt).format('D MMM HH:mm')}
+                        </small>
+                      )}
+                    </td>
+                    <td className="col-actions">
                       <div className="actions">
                         {b.status === 'pending' && (
                           <>
@@ -196,7 +222,21 @@ export default function BorrowRequests() {
                             </button>
                           </>
                         )}
-                        {isHolding(b) && (
+                        {needsPickup(b) && (
+                          <button
+                            type="button"
+                            aria-busy={busy}
+                            onClick={() =>
+                              act(b.id, api.pickupBorrow, {
+                                confirmMsg: `ยืนยันว่าส่งมอบ "${b.equipmentName}" ให้ ${b.borrowerName} แล้ว?`,
+                                successMsg: 'บันทึกการส่งมอบแล้ว',
+                              })
+                            }
+                          >
+                            ส่งมอบของ
+                          </button>
+                        )}
+                        {isHolding(b) && isPickedUp(b) && (
                           <button
                             type="button"
                             className="outline"

@@ -137,7 +137,7 @@ nav select {
 
 /* ===== Dialog ขอยืม ===== */
 dialog article {
-  max-width: 420px;
+  max-width: min(34rem, calc(100vw - 2rem));
 }
 dialog footer {
   display: flex;
@@ -225,7 +225,10 @@ h2 {
 .table-wrap {
   overflow-x: auto;
 }
-table button {
+/* ต้องเขียน :is(button, [type='button']) ไม่ใช่ button เฉย ๆ
+   เพราะ Pico ใส่ [type="button"] { margin-bottom: var(--pico-spacing) } ซึ่งเจาะจงกว่า
+   ปุ่มจะมีช่องว่างข้างล่าง 20px แล้วลอยสูงกว่าข้อความในแถวเดียวกัน ~12px */
+table :is(button, [type='button']) {
   width: auto;
   margin: 0;
   padding: 0.3rem 0.8rem;
@@ -271,7 +274,12 @@ td.overdue {
 }
 /* ชื่ออุปกรณ์เป็นข้อมูลหลัก อย่าให้ถูกบีบจนขึ้นบรรทัดละคำ */
 .col-name {
-  min-width: 11rem;
+  min-width: 15rem;
+}
+/* ชื่อคนถ้าบีบจะแตกเป็น "สมชาย" / "ใจดี" คนละบรรทัด
+   ใช้ nowrap แทน min-width เพราะชื่อยาวไม่เท่ากัน (เช่น ชื่อภาษาอังกฤษจาก OAuth) */
+.col-borrower {
+  white-space: nowrap;
 }
 /* จอแคบ: ซ่อนคอลัมน์รายละเอียด (ดูได้จากปุ่มแก้ไข) เพื่อไม่ต้องเลื่อนแนวนอนมาก */
 @media (max-width: 900px) {
@@ -448,4 +456,483 @@ button.danger {
 button.danger:is(:hover, :focus) {
   --pico-background-color: #a5311f;
   --pico-border-color: #a5311f;
+}
+
+/* ===== ช่วงเวลายืม (dialog ขอยืม) =====
+   ใช้ auto-fit แทน media query เพราะต้องยุบตามความกว้างของ dialog ไม่ใช่ของจอ
+   ช่องวันที่แคบกว่า 11rem จะโดนไอคอนปฏิทินดันจนล้น */
+.date-range {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1rem;
+}
+.date-range label {
+  margin-block-end: 0;
+  min-width: 0;
+}
+.date-range input {
+  width: 100%;
+  min-width: 0;
+}
+.range-summary {
+  margin-block: 0.5rem 1rem;
+  font-size: 0.9rem;
+  color: var(--pico-muted-color);
+}
+.range-summary strong {
+  color: var(--pico-color);
+}
+
+/* ===== เลือกอุปกรณ์หลายชิ้น ===== */
+.equipment-card--selected {
+  outline: 2px solid var(--pico-primary);
+  outline-offset: 2px;
+}
+
+/* checkbox "เลือก" บนการ์ด — ให้สูงเท่าปุ่มเดิมจะได้ไม่กระตุกตอนสลับ */
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pick input {
+  margin: 0;
+}
+.pick--disabled {
+  color: var(--pico-muted-color);
+  cursor: default;
+}
+
+/* แถบลอยด้านล่างจอ บอกว่าเลือกไว้กี่ชิ้น */
+.pick-bar {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: 0.6rem;
+  background: var(--pico-card-background-color);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.25);
+  border: 1px solid var(--pico-muted-border-color);
+}
+.pick-bar strong {
+  font-size: 1.1rem;
+}
+.pick-bar button {
+  width: auto;
+  margin: 0;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+/* รายชื่อของที่เลือกใน dialog */
+.pick-list {
+  list-style: none;
+  padding: 0;
+  margin-block: 0 1rem;
+  max-height: 11rem;
+  overflow-y: auto;
+}
+.pick-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-block: 0.35rem;
+  border-block-end: 1px solid var(--pico-muted-border-color);
+}
+.pick-list li:last-child {
+  border-block-end: none;
+}
+.pick-list button {
+  width: auto;
+  margin: 0;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* =========================================================================
+   ปรับความสวยงามรวม — ส่วนนี้อยู่ท้ายไฟล์เพื่อให้ทับกฎข้างบนได้
+   แก้เฉพาะ CSS ไม่แตะ logic
+   ========================================================================= */
+
+:root {
+  --ws-radius: 0.65rem;
+  --ws-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.16);
+  --ws-shadow-md: 0 8px 22px rgb(0 0 0 / 0.26);
+  --ws-ease: 160ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+/* ---------- หัวข้อหน้า ---------- */
+hgroup {
+  margin-block-end: 1.75rem;
+}
+hgroup h1 {
+  margin-block-end: 0.25rem;
+  letter-spacing: -0.01em;
+}
+hgroup > p {
+  margin: 0;
+  color: var(--pico-muted-color);
+}
+
+/* ---------- การ์ดอุปกรณ์: ยกขึ้นตอน hover + รูปซูมนิด ๆ ---------- */
+.equipment-card {
+  border-radius: var(--ws-radius);
+  border: 1px solid var(--pico-muted-border-color);
+  box-shadow: var(--ws-shadow-sm);
+  transition: transform var(--ws-ease), box-shadow var(--ws-ease), border-color var(--ws-ease);
+}
+.equipment-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--ws-shadow-md);
+  border-color: var(--pico-primary-border);
+}
+.equipment-card img {
+  transition: transform 260ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+.equipment-card:hover img {
+  transform: scale(1.04);
+}
+.equipment-card header strong {
+  letter-spacing: -0.01em;
+}
+/* เส้นคั่นบาง ๆ เหนือแถวล่างของการ์ด ให้ข้อมูลเป็นกลุ่มชัดขึ้น
+   Pico ใส่ margin-bottom ติดลบให้ article > footer เพื่อหักล้าง padding ของ article
+   แต่การ์ดนี้ตั้ง padding: 0 ถ้าไม่ล้างค่า footer จะถูกดึงทะลุขอบล่างแล้วโดน overflow ตัด
+   และมุมล่างต้องโค้งเท่าการ์ด ไม่งั้นเห็นมุมซ้อนกันสองชั้น */
+.equipment-card footer {
+  border-block-start: 1px solid var(--pico-muted-border-color);
+  padding-block: 0.75rem 1rem;
+  margin-block: 0;
+  border-end-start-radius: inherit;
+  border-end-end-radius: inherit;
+}
+.equipment-card--selected {
+  border-color: var(--pico-primary);
+}
+
+/* ---------- ป้ายสถานะ ---------- */
+.badge {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.6;
+}
+
+/* ---------- ตาราง: แถวสว่างขึ้นตอนชี้ อ่านง่ายขึ้น ---------- */
+.table-wrap {
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--ws-radius);
+  /* ต้องเป็น auto ทั้งสองแกน — ตารางหน้า staff กว้างเกินจอ ถ้า hidden ปุ่มขวาสุดจะโดนตัด */
+  overflow: auto;
+}
+.table-wrap table {
+  margin: 0;
+}
+.table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--pico-card-background-color);
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--pico-muted-color);
+}
+.table-wrap tbody tr {
+  transition: background var(--ws-ease);
+}
+.table-wrap tbody tr:hover {
+  background: var(--pico-code-background-color);
+}
+.table-wrap td,
+.table-wrap th {
+  padding-block: 0.8rem;
+}
+
+/* ---------- การ์ดสรุปตัวเลข ---------- */
+.stat {
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--ws-radius);
+  box-shadow: var(--ws-shadow-sm);
+  transition: transform var(--ws-ease), box-shadow var(--ws-ease);
+}
+.stat:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ws-shadow-md);
+}
+.stat strong {
+  font-size: 2.1rem;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.stat span {
+  font-weight: 500;
+}
+
+/* ---------- แท็บกรอง ---------- */
+.tabs button {
+  border-radius: 999px;
+  transition: all var(--ws-ease);
+}
+
+/* ---------- สถานะว่าง: กรอบประ บอกว่า "ว่างจริง ๆ ไม่ใช่โหลดไม่ขึ้น" ---------- */
+.empty {
+  border: 1px dashed var(--pico-muted-border-color);
+  border-radius: var(--ws-radius);
+  background: none;
+  box-shadow: none;
+}
+.empty p {
+  margin: 0;
+}
+
+/* ---------- ช่องกรอก ---------- */
+.toolbar input,
+.toolbar select {
+  border-radius: var(--ws-radius);
+}
+
+/* ---------- ปุ่ม ---------- */
+button,
+[role='button'] {
+  transition: background-color var(--ws-ease), border-color var(--ws-ease),
+    transform var(--ws-ease);
+}
+button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+/* ---------- โฟกัสด้วยคีย์บอร์ดให้เห็นชัด (a11y) ---------- */
+:is(a, button, input, select, textarea, [role='button']):focus-visible {
+  outline: 2px solid var(--pico-primary);
+  outline-offset: 2px;
+}
+
+/* ---------- แถบลอยเลือกของ ---------- */
+.pick-bar {
+  border-radius: var(--ws-radius);
+  backdrop-filter: blur(6px);
+}
+
+/* ---------- คอลัมน์ในตารางจัดการอุปกรณ์ ----------
+   ถ้าไม่กำหนดความกว้างขั้นต่ำ คำอธิบายจะถูกบีบจนแตกบรรทัดละ 2-3 คำ */
+.col-detail {
+  min-width: 12rem;
+}
+
+/* ---------- ตาราง "การยืมของฉัน" ----------
+   หน้านี้มี 2 ตาราง (กำลังดำเนินการ / ประวัติ) เป็น <table> คนละตัว
+   ถ้าปล่อยให้เบราว์เซอร์คำนวณความกว้างเอง แต่ละตารางจะอิงเนื้อหาของตัวเอง
+   ตารางที่มีปุ่มกับไม่มีปุ่มจึงได้คอลัมน์ไม่เท่ากัน ป้ายสถานะเลยเหลื่อมกัน
+   table-layout: fixed บังคับให้ใช้ความกว้างที่กำหนดไว้เท่านั้น */
+.borrow-table {
+  table-layout: fixed;
+}
+.borrow-table th:nth-child(1) { width: 30%; }  /* อุปกรณ์ */
+.borrow-table th:nth-child(2) { width: 16%; }  /* วันที่ขอ */
+.borrow-table th:nth-child(3) { width: 24%; }  /* ช่วงเวลายืม */
+.borrow-table th:nth-child(4) { width: 16%; }  /* สถานะ */
+.borrow-table th:nth-child(5) { width: 14%; }  /* ปุ่ม */
+
+/* ป้ายสถานะจัดกึ่งกลางคอลัมน์ ให้ทั้งสองตารางดูเป็นแนวเดียวกัน */
+.borrow-table :is(th, td):nth-child(4) {
+  text-align: center;
+}
+.borrow-table td:nth-child(4) .muted-line {
+  text-align: center;
+}
+.borrow-table td:nth-child(5) .actions {
+  justify-content: center;
+}
+.thumb {
+  border-radius: 0.4rem;
+  box-shadow: var(--ws-shadow-sm);
+}
+
+/* ---------- คอลัมน์ตัวเลขและคอลัมน์ปุ่ม (ใช้ร่วมทุกตารางฝั่ง staff) ----------
+   table-layout: auto จะเกลี่ยพื้นที่ที่เหลือให้ทุกคอลัมน์เท่า ๆ กัน
+   ทุกคอลัมน์เลยถูกถ่างออกจากกันจนดูลอย
+
+   แก้ด้วยการให้ "คอลัมน์รายละเอียด" รับพื้นที่ว่างไว้คนเดียว (width: 100%)
+   คอลัมน์ที่เหลือจะหดมาพอดีเนื้อหา แล้วเกาะกลุ่มกันแน่น */
+.col-detail,
+.col-grow {
+  width: 100%;
+}
+/* col-grow = รับพื้นที่ว่างเหมือน col-detail แต่ "ไม่ซ่อน" ตอนจอแคบ
+   ใช้กับคอลัมน์สำคัญอย่างช่วงเวลายืม */
+.col-num {
+  width: 1%;
+  padding-inline: 1.25rem;
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.col-actions {
+  width: 1%;
+  white-space: nowrap;
+}
+.col-actions .actions {
+  justify-content: flex-end;
+}
+
+/* แถวในตารางจัดกลางแนวตั้ง ไม่งั้นปุ่มจะลอยอยู่บนสุดเมื่อข้อความขึ้น 2 บรรทัด */
+.table-wrap tbody td {
+  vertical-align: middle;
+}
+
+/* แถวเตี้ยลง เนื้อหาจะได้ไม่ลอยอยู่กลางที่ว่าง */
+.table-wrap :is(td, th) {
+  padding-block: 0.6rem;
+}
+
+/* รูปย่อใหญ่ขึ้นให้สมดุลกับความสูงแถว และคอลัมน์รูปบีบให้พอดีรูป */
+.thumb {
+  width: 72px;
+  height: 48px;
+}
+/* ใช้ class เฉพาะ ห้ามใช้ th:first-child
+   เพราะจะไปจับคอลัมน์แรกของ "ทุกตาราง" — เคยทำให้หน้าการยืมของฉันแตกตัวอักษรทีละตัว */
+.col-thumb {
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* ข้อความสั้นที่ไม่ควรตัดบรรทัด เช่น ชื่อหมวดหมู่ ชื่อผู้ยืม */
+.col-nowrap {
+  white-space: nowrap;
+}
+
+/* =========================================================================
+   หน้าเข้าสู่ระบบ — หน้าแรกที่ทุกคนเห็น เลยจัดให้เต็มจอและอยู่กึ่งกลาง
+   (ทับกฎ .signin ใน index.css เพราะ App.css ถูก import ทีหลัง)
+   ========================================================================= */
+.signin {
+  max-width: none;
+  margin: 0;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.signin__card {
+  width: min(26rem, 100%);
+  margin: 0;
+  padding: 2.25rem 2rem 1.5rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 1rem;
+  box-shadow: var(--ws-shadow-md);
+}
+
+.signin__head {
+  margin: 0 0 1.75rem;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: center;
+}
+
+/* วงกลมไอคอนกล่องพัสดุ — สื่อความหมายของระบบตั้งแต่หน้าแรก */
+.signin__logo {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  color: var(--pico-primary);
+  background: color-mix(in srgb, var(--pico-primary) 14%, transparent);
+}
+
+.signin__head h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.45rem;
+  letter-spacing: -0.01em;
+}
+.signin__head p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--pico-muted-color);
+}
+
+/* ป้ายคั่นก่อนปุ่ม — มีเส้นขีดสองข้างให้รู้ว่าด้านล่างคือตัวเลือก */
+.signin__hint {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-block: 0 1rem;
+  font-size: 0.8rem;
+  color: var(--pico-muted-color);
+}
+.signin__hint::before,
+.signin__hint::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--pico-muted-border-color);
+}
+
+/* ต้องเขียน a.signin__btn ไม่ใช่ .signin__btn เฉย ๆ
+   เพราะ Pico ใช้ a[role="button"] { display: inline-block } ซึ่งเจาะจงกว่า
+   ทำให้ display:flex ใน index.css ไม่ติด ไอคอนเลยชนข้อความ */
+a.signin__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  border-radius: 0.6rem;
+  padding-block: 0.8rem;
+  font-weight: 600;
+}
+
+.signin__error {
+  margin-block-end: 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.6rem;
+  font-size: 0.875rem;
+  color: #fff;
+  background: #c0392b;
+}
+.signin__error code {
+  color: inherit;
+  background: rgb(255 255 255 / 0.18);
+}
+
+.signin__foot {
+  margin: 1.25rem 0 0;
+  padding: 0.9rem 0 0;
+  border: none;
+  border-block-start: 1px solid var(--pico-muted-border-color);
+  background: none;
+  text-align: center;
+  color: var(--pico-muted-color);
+}
+
+/* ---------- เคารพการตั้งค่าลดการเคลื่อนไหวของผู้ใช้ ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+  .equipment-card:hover,
+  .stat:hover {
+    transform: none;
+  }
+  .equipment-card:hover img {
+    transform: none;
+  }
 }

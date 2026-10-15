@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import type {
-  Equipment, EquipmentInput, Borrow, BorrowStatus, EquipmentLog,
-  Category, CategoryInput, User, Role,
+  Equipment, EquipmentInput, Borrow, BorrowDetails, BorrowStatus, EquipmentLog,
+  Category, CategoryInput, Department, User, Role,
 } from '../types'
 
 const delay = (ms = 400) => new Promise((r) => setTimeout(r, ms))
@@ -44,6 +44,27 @@ let equipment: EquipmentRow[] = [
   { id: 'e6', categoryId: 3, categoryName: null, name: 'ไฟ LED Godox SL60', description: 'พร้อมซอฟต์บ็อกซ์', imageUrl: 'https://picsum.photos/seed/light/400/240', quantity: 6 },
 ]
 
+let departments: Department[] = [
+  { id: 1, name: 'คณะวิศวกรรมศาสตร์', createdAt: dayjs().subtract(60, 'day').toISOString() },
+  { id: 2, name: 'คณะบริหารธุรกิจ', createdAt: dayjs().subtract(60, 'day').toISOString() },
+]
+
+// สร้างข้อมูลช่วงเวลายืมให้ครบรูปแบบเดียวกับที่ backend ส่งมา (ตาราง ws_borrow_details)
+function makeDetails(
+  borrowId: string,
+  startAt: string,
+  endAt: string,
+  pickedUp = false,
+): BorrowDetails {
+  return {
+    borrowId,
+    startAt,
+    endAt,
+    pickedUpAt: pickedUp ? startAt : null,
+    pickedUpBy: pickedUp ? 'u2' : null,
+  }
+}
+
 // seed ให้มีรายการยืมอยู่แล้ว จะได้เห็นหน้าต่าง ๆ ไม่ว่างเปล่า
 let borrows: Borrow[] = [
   {
@@ -53,6 +74,13 @@ let borrows: Borrow[] = [
     purpose: null, approvedBy: null, approverName: null, approvedAt: null,
     rejectReason: null, receivedBy: null, returnNote: null,
     status: 'approved', createdAt: dayjs().subtract(2, 'day').toISOString(), returnedAt: null,
+    // รับของไปแล้ว
+    details: makeDetails(
+      'b1',
+      dayjs().subtract(2, 'day').toISOString(),
+      dayjs().add(5, 'day').toISOString(),
+      true,
+    ),
   },
   {
     id: 'b2', equipmentId: 'e5', equipmentName: 'โปรเจกเตอร์ Epson EB-X06',
@@ -61,6 +89,12 @@ let borrows: Borrow[] = [
     purpose: null, approvedBy: null, approverName: null, approvedAt: null,
     rejectReason: null, receivedBy: null, returnNote: null,
     status: 'approved', createdAt: dayjs().subtract(9, 'day').toISOString(), returnedAt: null,
+    // อนุมัติแล้วแต่ "ยังไม่มารับของ" — ไว้ทดสอบปุ่มส่งมอบ
+    details: makeDetails(
+      'b2',
+      dayjs().subtract(9, 'day').toISOString(),
+      dayjs().subtract(1, 'day').toISOString(),
+    ),
   },
   {
     id: 'b3', equipmentId: 'e1', equipmentName: 'กล้อง Canon EOS R50',
@@ -70,6 +104,12 @@ let borrows: Borrow[] = [
     rejectReason: null, receivedBy: null, returnNote: null,
     status: 'returned', createdAt: dayjs().subtract(30, 'day').toISOString(),
     returnedAt: dayjs().subtract(21, 'day').toISOString(),
+    details: makeDetails(
+      'b3',
+      dayjs().subtract(30, 'day').toISOString(),
+      dayjs().subtract(20, 'day').toISOString(),
+      true,
+    ),
   },
 ]
 
@@ -177,19 +217,29 @@ export const mockApi = {
   },
 
   // ===== การยืม — ฝั่งผู้ยืม =====
-  async requestBorrow(equipmentId: string, dueDate: string, purpose?: string): Promise<Borrow> {
+  // startAt/endAt เป็น ISO พร้อม timezone — backend คำนวณ dueDate จาก endAt ให้เอง
+  async requestBorrow(
+    equipmentId: string,
+    startAt: string,
+    endAt: string,
+    purpose?: string,
+  ): Promise<Borrow> {
     await delay()
     const item = findEquipment(equipmentId)
     if (item.available <= 0) throw new Error('อุปกรณ์ชิ้นนี้ถูกยืมหมดแล้ว')
+    if (!dayjs(endAt).isAfter(dayjs(startAt))) {
+      throw new Error('วันสิ้นสุดต้องอยู่หลังวันเริ่มต้น')
+    }
     const me = findUser(CURRENT_USER_ID)
+    const id = crypto.randomUUID()
 
     const borrow: Borrow = {
-      id: crypto.randomUUID(),
+      id,
       equipmentId,
       equipmentName: item.name,
       borrowerId: me.id,
       borrowerName: me.fullName,
-      dueDate,
+      dueDate: dayjs(endAt).format('YYYY-MM-DD'),
       purpose: purpose ?? null,
       approvedBy: null,
       approverName: null,
@@ -200,6 +250,7 @@ export const mockApi = {
       status: 'pending',
       createdAt: new Date().toISOString(),
       returnedAt: null,
+      details: makeDetails(id, startAt, endAt),
     }
     borrows = [...borrows, borrow]
     return borrow
@@ -246,6 +297,24 @@ export const mockApi = {
     return patchBorrow(borrowId, { status: 'approved' })
   },
 
+  // เจ้าหน้าที่ยืนยันว่าส่งมอบของให้ผู้ยืมแล้ว
+  // ไม่ได้เปลี่ยน status — ดูจาก details.pickedUpAt แทน (ตรงกับที่ backend ทำ)
+  async pickupBorrow(borrowId: string): Promise<Borrow> {
+    await delay()
+    const b = findBorrow(borrowId)
+    if (b.status !== 'approved') throw new Error('ต้องอนุมัติรายการก่อนส่งมอบ')
+    if (!b.details) throw new Error('ไม่มีข้อมูลช่วงเวลายืม')
+    if (b.details.pickedUpAt) throw new Error('รายการนี้รับอุปกรณ์แล้ว')
+
+    return patchBorrow(borrowId, {
+      details: {
+        ...b.details,
+        pickedUpAt: new Date().toISOString(),
+        pickedUpBy: CURRENT_USER_ID,
+      },
+    })
+  },
+
   async rejectBorrow(borrowId: string, reason?: string): Promise<Borrow> {
     await delay()
     const b = findBorrow(borrowId)
@@ -261,6 +330,42 @@ export const mockApi = {
     }
     // ไม่ต้องแก้ equipment — available จะเพิ่มขึ้นเองเพราะคำนวณจาก borrows
     return patchBorrow(borrowId, { status: 'returned', returnedAt: new Date().toISOString(), returnNote: note ?? null })
+  },
+
+  // ===== แผนก =====
+  async listDepartments(): Promise<Department[]> {
+    await delay()
+    return departments
+  },
+
+  async createDepartment(name: string): Promise<Department> {
+    await delay()
+    if (!name.trim()) throw new Error('ชื่อแผนกต้องมี 1–120 ตัวอักษร')
+    if (departments.some((d) => d.name === name.trim())) throw new Error('ชื่อแผนกซ้ำ')
+
+    const dep: Department = {
+      id: Math.max(0, ...departments.map((d) => d.id)) + 1,
+      name: name.trim(),
+      createdAt: new Date().toISOString(),
+    }
+    departments = [...departments, dep]
+    return dep
+  },
+
+  // โหมด mock ไม่ได้ผูกอุปกรณ์กับแผนกจริง คืนทั้งหมดไปก่อน
+  async departmentEquipment(): Promise<Equipment[]> {
+    await delay()
+    return equipment.map(withAvailable)
+  },
+
+  async assignEquipmentToDepartment(departmentId: number, equipmentId: string) {
+    await delay()
+    return { equipmentId, departmentId }
+  },
+
+  async assignStaffToDepartment(departmentId: number, userId: string) {
+    await delay()
+    return { userId, departmentId }
   },
 
   // ===== ผู้ใช้ — ฝั่ง admin =====

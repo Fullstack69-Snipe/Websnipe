@@ -27,4 +27,5 @@ export const LOG_ACTION_LABEL: Record<LogAction, string> = {
   borrow_return_requested: 'แจ้งคืน',
   borrow_returned: 'รับคืนแล้ว',
   borrow_cancelled: 'ยกเลิกคำขอ',
+  borrow_picked_up: 'รับของแล้ว',
 }

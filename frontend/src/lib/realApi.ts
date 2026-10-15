@@ -1,6 +1,6 @@
 import type {
   Equipment, EquipmentInput, Borrow, EquipmentLog,
-  Category, CategoryInput, User, Role,
+  Category, CategoryInput, User, Role, Department,
 } from '../types'
 
 // ===================================================================
@@ -71,8 +71,9 @@ export const realApi = {
     send<{ ok: true; unassigned: number }>('DELETE', `/categories/${id}`),
 
   // ===== การยืม — ฝั่งผู้ยืม =====
-  requestBorrow: (equipmentId: string, dueDate: string, purpose?: string) =>
-    send<Borrow>('POST', '/borrows', { equipmentId, dueDate, purpose }),
+  // startAt/endAt ต้องเป็น ISO พร้อม timezone — backend คำนวณ dueDate ให้เอง
+  requestBorrow: (equipmentId: string, startAt: string, endAt: string, purpose?: string) =>
+    send<Borrow>('POST', '/borrows', { equipmentId, startAt, endAt, purpose }),
 
   listMyBorrows: () => get<Borrow[]>('/borrows/mine'),
 
@@ -87,6 +88,9 @@ export const realApi = {
 
   approveBorrow: (borrowId: string) => send<Borrow>('PUT', `/borrows/${borrowId}/approve`),
 
+    // เจ้าหน้าที่ยืนยันว่าส่งมอบของให้ผู้ยืมแล้ว (เฉพาะสถานะ approved / กดซ้ำได้ 409)
+  pickupBorrow: (borrowId: string) => send<Borrow>('PUT', `/borrows/${borrowId}/pickup`),
+
   rejectBorrow: (borrowId: string, reason?: string) =>
     send<Borrow>('PUT', `/borrows/${borrowId}/reject`, { reason }),
 
@@ -96,6 +100,28 @@ export const realApi = {
   // ประวัติของอุปกรณ์ชิ้นหนึ่ง (staff, admin)
   equipmentLogs: (equipmentId: string) =>
     get<EquipmentLog[]>(`/equipment/${equipmentId}/logs`),
+
+  // ===== แผนก =====
+  listDepartments: () => get<Department[]>('/departments'),
+
+  createDepartment: (name: string) => send<Department>('POST', '/departments', { name }),
+
+  departmentEquipment: (departmentId: number) =>
+    get<Equipment[]>(`/departments/${departmentId}/equipment`),
+
+  // ย้ายอุปกรณ์เข้าแผนก (admin) — ชิ้นหนึ่งอยู่ได้แผนกเดียว ย้ายซ้ำได้
+  assignEquipmentToDepartment: (departmentId: number, equipmentId: string) =>
+    send<{ equipmentId: string; departmentId: number }>(
+      'PUT',
+      `/departments/${departmentId}/equipment/${equipmentId}`,
+    ),
+
+  // มอบหมาย staff ให้ดูแลแผนก (admin) — คนหนึ่งดูแลได้หลายแผนก
+  assignStaffToDepartment: (departmentId: number, userId: string) =>
+    send<{ userId: string; departmentId: number }>(
+      'PUT',
+      `/departments/${departmentId}/staff/${userId}`,
+    ),
 
   // ===== ผู้ใช้ — ฝั่ง admin =====
   listUsers: () => get<User[]>('/users'),

@@ -125,10 +125,10 @@ export default function ManageCategories() {
         <table>
           <thead>
             <tr>
-              <th>ชื่อ</th>
+              <th className="col-name">ชื่อ</th>
               <th>คำอธิบาย</th>
-              <th>อุปกรณ์</th>
-              <th></th>
+              <th className="col-num">อุปกรณ์</th>
+              <th className="col-actions"></th>
             </tr>
           </thead>
           <tbody>
@@ -139,10 +139,10 @@ export default function ManageCategories() {
             )}
             {items.map((c) => (
               <tr key={c.id}>
-                <td>{c.name}</td>
+                <td className="col-name"><strong>{c.name}</strong></td>
                 <td className="muted">{c.description}</td>
-                <td>{c.equipmentCount}</td>
-                <td>
+                <td className="col-num">{c.equipmentCount}</td>
+                <td className="col-actions">
                   <div className="actions">
                     <button type="button" className="outline" onClick={() => startEdit(c)}>
                       แก้ไข

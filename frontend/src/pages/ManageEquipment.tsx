@@ -91,13 +91,13 @@ export default function ManageEquipment() {
           <table>
             <thead>
               <tr>
-                <th>รูป</th>
+                <th className="col-thumb">รูป</th>
                 <th className="col-name">ชื่อ</th>
-                <th>หมวดหมู่</th>
+                <th className="col-nowrap">หมวดหมู่</th>
                 <th className="col-detail">รายละเอียด</th>
-                <th>จำนวน</th>
-                <th>เหลือ</th>
-                <th></th>
+                <th className="col-num">จำนวน</th>
+                <th className="col-num">เหลือ</th>
+                <th className="col-actions"></th>
               </tr>
             </thead>
             <tbody>
@@ -105,7 +105,7 @@ export default function ManageEquipment() {
                 const borrowed = item.quantity - item.available
                 return (
                   <tr key={item.id}>
-                    <td>
+                    <td className="col-thumb">
                       {item.imageUrl ? (
                         <img className="thumb" src={item.imageUrl} alt="" />
                       ) : (
@@ -113,15 +113,15 @@ export default function ManageEquipment() {
                       )}
                     </td>
                     <td className="col-name"><strong>{item.name}</strong></td>
-                    <td className="muted">
+                    <td className="muted col-nowrap">
                       {item.categoryName ?? '—'}
                     </td>
                     <td className="muted col-detail">{item.description}</td>
-                    <td>{item.quantity}</td>
-                    <td className={item.available === 0 ? 'overdue' : undefined}>
+                    <td className="col-num">{item.quantity}</td>
+                    <td className={`col-num ${item.available === 0 ? 'overdue' : ''}`}>
                       {item.available}
                     </td>
-                    <td>
+                    <td className="col-actions">
                       <div className="actions">
                         <button type="button" className="outline" onClick={() => setEditing(item)}>
                           แก้ไข
